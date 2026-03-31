@@ -26,6 +26,7 @@ supabase/migrations/00001_schema.sql   ← Tables, enums, views
 supabase/migrations/00002_rls.sql      ← Row Level Security
 supabase/migrations/00003_triggers.sql ← Automation triggers
 supabase/migrations/00005_storage.sql  ← Storage bucket + policies
+supabase/migrations/00006_epf_ecr_workflow.sql ← NGO-specific EPF/ECR fields + report workflow
 ```
 
 For `00004_cron.sql`:
@@ -56,22 +57,23 @@ Dashboard → Authentication → Providers → Email:
 
 Install Supabase CLI:
 ```bash
-npm install -g supabase
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
+npm install --save-dev supabase
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
 ```
 
 Get your project ref from: Dashboard → Settings → General → Reference ID
 
 ```bash
 # Deploy all functions
-supabase functions deploy send-notification-email
-supabase functions deploy generate-event-summary
-supabase functions deploy submit-event
+npx supabase functions deploy send-notification-email
+npx supabase functions deploy generate-event-summary
+npx supabase functions deploy submit-event
 
 # Set secrets
-supabase secrets set RESEND_API_KEY=re_YOUR_KEY
-supabase secrets set APP_URL=https://YOUR_APP.vercel.app
+npx supabase secrets set RESEND_API_KEY=re_YOUR_KEY
+npx supabase secrets set RESEND_FROM_EMAIL="NGO Events <onboarding@resend.dev>"
+npx supabase secrets set APP_URL=https://YOUR_APP.vercel.app
 ```
 
 ---

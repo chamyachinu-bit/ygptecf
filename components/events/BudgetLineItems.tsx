@@ -10,13 +10,16 @@ export interface BudgetLine {
   id?: string
   category: string
   description: string | null
+  justification?: string | null
   estimated_amount: number
+  actual_amount?: number | null
 }
 
 interface BudgetLineItemsProps {
   items: BudgetLine[]
   onChange: (items: BudgetLine[]) => void
   readOnly?: boolean
+  showActual?: boolean
 }
 
 const CATEGORIES = [
@@ -25,9 +28,9 @@ const CATEGORIES = [
   'Printing', 'Contingency', 'Other',
 ]
 
-export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsProps) {
+export function BudgetLineItems({ items, onChange, readOnly, showActual }: BudgetLineItemsProps) {
   const addLine = () => {
-    onChange([...items, { category: '', description: '', estimated_amount: 0 }])
+    onChange([...items, { category: '', description: '', justification: '', estimated_amount: 0, actual_amount: null }])
   }
 
   const removeLine = (index: number) => {
@@ -41,23 +44,36 @@ export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsPr
     onChange(updated)
   }
 
-  const total = items.reduce((sum, item) => sum + (Number(item.estimated_amount) || 0), 0)
+  const totalEstimated = items.reduce((sum, item) => sum + (Number(item.estimated_amount) || 0), 0)
+  const totalActual = items.reduce((sum, item) => sum + (Number(item.actual_amount) || 0), 0)
 
   if (readOnly) {
     return (
       <div className="space-y-2">
         {items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+          <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-4">
             <div>
               <p className="text-sm font-medium">{item.category}</p>
               {item.description && <p className="text-xs text-gray-500">{item.description}</p>}
+              {item.justification && <p className="text-xs text-gray-400 mt-1">Why needed: {item.justification}</p>}
             </div>
-            <p className="text-sm font-semibold">{formatCurrency(item.estimated_amount)}</p>
+            <div className="text-right">
+              <p className="text-sm font-semibold">{formatCurrency(item.estimated_amount)}</p>
+              {showActual && item.actual_amount !== undefined && item.actual_amount !== null && (
+                <p className="text-xs text-cyan-700">Actual: {formatCurrency(item.actual_amount)}</p>
+              )}
+            </div>
           </div>
         ))}
         <div className="flex items-center justify-between pt-2 border-t-2 border-gray-200">
-          <p className="font-semibold">Total Estimated</p>
-          <p className="font-bold text-green-700">{formatCurrency(total)}</p>
+          <div>
+            <p className="font-semibold">Total Estimated</p>
+            {showActual && <p className="text-xs text-gray-500">Actual total shown when submitted.</p>}
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-green-700">{formatCurrency(totalEstimated)}</p>
+            {showActual && <p className="text-xs font-semibold text-cyan-700">{formatCurrency(totalActual)}</p>}
+          </div>
         </div>
       </div>
     )
@@ -66,7 +82,7 @@ export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsPr
   return (
     <div className="space-y-3">
       {items.map((item, index) => (
-        <div key={index} className="flex gap-2 items-end p-3 bg-gray-50 rounded-lg">
+        <div key={index} className="grid gap-2 p-3 bg-gray-50 rounded-lg md:grid-cols-[1fr,1fr,1fr,140px,140px,48px] md:items-end">
           <div className="flex-1 min-w-0">
             <Label className="text-xs mb-1 block">Category</Label>
             <select
@@ -86,6 +102,14 @@ export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsPr
               onChange={(e) => updateLine(index, 'description', e.target.value)}
             />
           </div>
+          <div className="flex-1 min-w-0">
+            <Label className="text-xs mb-1 block">Justification</Label>
+            <Input
+              placeholder="Why this line is needed"
+              value={item.justification ?? ''}
+              onChange={(e) => updateLine(index, 'justification', e.target.value)}
+            />
+          </div>
           <div className="w-32">
             <Label className="text-xs mb-1 block">Amount (USD)</Label>
             <Input
@@ -97,6 +121,19 @@ export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsPr
               onChange={(e) => updateLine(index, 'estimated_amount', parseFloat(e.target.value) || 0)}
             />
           </div>
+          {showActual && (
+            <div className="w-32">
+              <Label className="text-xs mb-1 block">Actual (USD)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={item.actual_amount || ''}
+                onChange={(e) => updateLine(index, 'actual_amount', parseFloat(e.target.value) || 0)}
+              />
+            </div>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -116,8 +153,14 @@ export function BudgetLineItems({ items, onChange, readOnly }: BudgetLineItemsPr
 
       {items.length > 0 && (
         <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-          <span className="font-medium text-sm">Total Estimated</span>
-          <span className="font-bold text-green-700">{formatCurrency(total)}</span>
+          <div>
+            <span className="font-medium text-sm">Total Estimated</span>
+            {showActual && <p className="text-xs text-gray-500">Actual total updates the final ECR spend.</p>}
+          </div>
+          <div className="text-right">
+            <span className="font-bold text-green-700">{formatCurrency(totalEstimated)}</span>
+            {showActual && <p className="text-xs font-semibold text-cyan-700">{formatCurrency(totalActual)}</p>}
+          </div>
         </div>
       )}
     </div>

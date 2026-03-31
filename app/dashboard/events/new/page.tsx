@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -12,49 +12,150 @@ import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLine
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
+const EVENT_CODE_REGEX = /^[A-Z]{3}[A-Z]{3}[0-9]{2}$/
+const GOALS = [
+  'Awareness Campaign',
+  'Community Outreach',
+  'Capacity Building',
+  'Fundraising',
+  'Volunteer Engagement',
+  'Partnership Development',
+  'Monitoring & Evaluation',
+]
+const SOCIAL_CHANNELS = ['Facebook', 'Instagram', 'LinkedIn', 'WhatsApp', 'YouTube', 'Press']
+
 export default function NewEventPage() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([
-    { category: 'Venue', description: '', estimated_amount: 0 },
+    { category: 'Venue', description: '', justification: '', estimated_amount: 0, actual_amount: null },
   ])
   const [form, setForm] = useState({
+    event_code: '',
     title: '',
     description: '',
+    goal: GOALS[0],
     region: '',
     event_date: '',
     event_end_date: '',
+    start_time: '',
+    end_time: '',
     location: '',
     expected_attendees: '',
+    participant_profile: '',
+    coordinator_name: '',
+    coordinator_phone: '',
+    coordinator_email: '',
+    requires_budget: true,
+    budget_justification: '',
+    social_media_required: false,
+    social_media_requirements: '',
+    social_media_caption: '',
+    social_media_channels: [] as string[],
   })
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, phone, region')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) {
+        setForm((current) => ({
+          ...current,
+          coordinator_name: current.coordinator_name || profile.full_name || '',
+          coordinator_email: current.coordinator_email || profile.email || '',
+          coordinator_phone: current.coordinator_phone || profile.phone || '',
+          region: current.region || profile.region || '',
+        }))
+      }
+    }
+
+    loadProfile()
+  }, [supabase])
+
+  const budgetLinesValid = useMemo(
+    () => budgetLines.filter((line) => line.category && Number(line.estimated_amount) > 0),
+    [budgetLines]
+  )
+
+  const toggleChannel = (channel: string) => {
+    setForm((current) => ({
+      ...current,
+      social_media_channels: current.social_media_channels.includes(channel)
+        ? current.social_media_channels.filter((item) => item !== channel)
+        : [...current.social_media_channels, channel],
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent, asDraft = true) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    const eventCode = form.event_code.trim().toUpperCase()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Not authenticated'); setLoading(false); return }
-
-    if (!asDraft && budgetLines.length === 0) {
-      setError('Add at least one budget line before submitting.')
+    if (!user) {
+      setError('Not authenticated')
       setLoading(false)
       return
     }
 
-    // Create event
+    if (!EVENT_CODE_REGEX.test(eventCode)) {
+      setError('Event code must use the format MUMFEB01.')
+      setLoading(false)
+      return
+    }
+
+    if (!form.requires_budget && !form.budget_justification.trim()) {
+      setError('Explain why no budget is required for this proposal.')
+      setLoading(false)
+      return
+    }
+
+    if (form.requires_budget && !asDraft && budgetLinesValid.length === 0) {
+      setError('Add at least one valid budget line before submitting.')
+      setLoading(false)
+      return
+    }
+
+    if (form.social_media_required && form.social_media_channels.length === 0) {
+      setError('Select at least one social media channel when promotion is required.')
+      setLoading(false)
+      return
+    }
+
     const { data: event, error: eventError } = await supabase
       .from('events')
       .insert({
-        title: form.title,
-        description: form.description,
-        region: form.region,
+        event_code: eventCode,
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        goal: form.goal,
+        region: form.region.trim(),
         event_date: form.event_date,
         event_end_date: form.event_end_date || null,
-        location: form.location,
-        expected_attendees: parseInt(form.expected_attendees) || 0,
+        start_time: form.start_time || null,
+        end_time: form.end_time || null,
+        location: form.location.trim(),
+        expected_attendees: parseInt(form.expected_attendees, 10) || 0,
+        participant_profile: form.participant_profile.trim() || null,
+        coordinator_name: form.coordinator_name.trim() || null,
+        coordinator_phone: form.coordinator_phone.trim() || null,
+        coordinator_email: form.coordinator_email.trim() || null,
+        requires_budget: form.requires_budget,
+        budget_justification: form.budget_justification.trim() || null,
+        social_media_required: form.social_media_required,
+        social_media_channels: form.social_media_required ? form.social_media_channels : [],
+        social_media_requirements: form.social_media_required ? form.social_media_requirements.trim() || null : null,
+        social_media_caption: form.social_media_required ? form.social_media_caption.trim() || null : null,
         created_by: user.id,
         status: asDraft ? 'draft' : 'submitted',
         submitted_at: asDraft ? null : new Date().toISOString(),
@@ -69,13 +170,21 @@ export default function NewEventPage() {
       return
     }
 
-    // Insert budget lines
-    if (budgetLines.length > 0) {
-      const validLines = budgetLines.filter(b => b.category && b.estimated_amount > 0)
-      if (validLines.length > 0) {
-        await supabase.from('budgets').insert(
-          validLines.map(b => ({ ...b, event_id: event.id }))
-        )
+    if (form.requires_budget && budgetLinesValid.length > 0) {
+      const { error: budgetError } = await supabase.from('budgets').insert(
+        budgetLinesValid.map((line) => ({
+          event_id: event.id,
+          category: line.category,
+          description: line.description || null,
+          justification: line.justification || null,
+          estimated_amount: Number(line.estimated_amount) || 0,
+        }))
+      )
+
+      if (budgetError) {
+        setError(budgetError.message)
+        setLoading(false)
+        return
       }
     }
 
@@ -90,17 +199,44 @@ export default function NewEventPage() {
             <ArrowLeft className="w-4 h-4" />
           </button>
         </Link>
-        <h1 className="text-xl font-semibold">New Event Proposal</h1>
+        <div>
+          <h1 className="text-xl font-semibold">New Event Proposal</h1>
+          <p className="text-sm text-gray-500">Build the full EPF before moving it into review.</p>
+        </div>
       </div>
 
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
         <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-6">
-          {/* Event Details */}
           <Card>
             <CardHeader>
               <CardTitle>Event Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="event_code">Event Code *</Label>
+                  <Input
+                    id="event_code"
+                    placeholder="MUMFEB01"
+                    value={form.event_code}
+                    onChange={(e) => setForm({ ...form, event_code: e.target.value.toUpperCase() })}
+                    required
+                  />
+                  <p className="text-xs text-gray-500">Use the format `MUMFEB01`.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="goal">Goal *</Label>
+                  <select
+                    id="goal"
+                    value={form.goal}
+                    onChange={(e) => setForm({ ...form, goal: e.target.value })}
+                    className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    {GOALS.map((goal) => <option key={goal} value={goal}>{goal}</option>)}
+                  </select>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="title">Event Title *</Label>
                 <Input
@@ -111,39 +247,42 @@ export default function NewEventPage() {
                   required
                 />
               </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Goal / Purpose</Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe the event's purpose, target audience, and expected outcomes..."
+                  placeholder="Summarize the event purpose, expected change, and why the NGO is running it."
                   rows={4}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="region">Region *</Label>
                   <Input
                     id="region"
-                    placeholder="e.g., East Africa"
+                    placeholder="e.g., Mumbai"
                     value={form.region}
                     onChange={(e) => setForm({ ...form, region: e.target.value })}
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="location">Location *</Label>
+                  <Label htmlFor="location">Venue / Location *</Label>
                   <Input
                     id="location"
-                    placeholder="e.g., Nairobi Community Centre"
+                    placeholder="e.g., Andheri Community Hall"
                     value={form.location}
                     onChange={(e) => setForm({ ...form, location: e.target.value })}
                     required
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="event_date">Start Date *</Label>
                   <Input
@@ -162,11 +301,11 @@ export default function NewEventPage() {
                     type="date"
                     value={form.event_end_date}
                     onChange={(e) => setForm({ ...form, event_end_date: e.target.value })}
-                    min={form.event_date}
+                    min={form.event_date || undefined}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="expected_attendees">Expected Attendees *</Label>
+                  <Label htmlFor="expected_attendees">Expected Participants *</Label>
                   <Input
                     id="expected_attendees"
                     type="number"
@@ -178,16 +317,185 @@ export default function NewEventPage() {
                   />
                 </div>
               </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start_time">Start Time</Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={form.start_time}
+                    onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="end_time">End Time</Label>
+                  <Input
+                    id="end_time"
+                    type="time"
+                    value={form.end_time}
+                    onChange={(e) => setForm({ ...form, end_time: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="participant_profile">Participant Profile</Label>
+                <Textarea
+                  id="participant_profile"
+                  placeholder="Who will attend? Mention audience segments, age bands, partner organizations, or beneficiary groups."
+                  rows={3}
+                  value={form.participant_profile}
+                  onChange={(e) => setForm({ ...form, participant_profile: e.target.value })}
+                />
+              </div>
             </CardContent>
           </Card>
 
-          {/* Budget */}
           <Card>
             <CardHeader>
-              <CardTitle>Budget Breakdown</CardTitle>
+              <CardTitle>Budget</CardTitle>
             </CardHeader>
-            <CardContent>
-              <BudgetLineItems items={budgetLines} onChange={setBudgetLines} />
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Does this event require budget support? *</Label>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant={form.requires_budget ? 'default' : 'outline'}
+                    onClick={() => setForm({ ...form, requires_budget: true })}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!form.requires_budget ? 'default' : 'outline'}
+                    onClick={() => setForm({ ...form, requires_budget: false })}
+                  >
+                    No
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="budget_justification">Budget Rules / Justification *</Label>
+                <Textarea
+                  id="budget_justification"
+                  placeholder="Explain the spending logic, approvals needed, donation match, or why no budget is needed."
+                  rows={3}
+                  value={form.budget_justification}
+                  onChange={(e) => setForm({ ...form, budget_justification: e.target.value })}
+                />
+              </div>
+
+              {form.requires_budget && (
+                <BudgetLineItems items={budgetLines} onChange={setBudgetLines} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Coordinator Details</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="coordinator_name">Coordinator Name *</Label>
+                <Input
+                  id="coordinator_name"
+                  value={form.coordinator_name}
+                  onChange={(e) => setForm({ ...form, coordinator_name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="coordinator_phone">Coordinator Phone</Label>
+                <Input
+                  id="coordinator_phone"
+                  value={form.coordinator_phone}
+                  onChange={(e) => setForm({ ...form, coordinator_phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="coordinator_email">Coordinator Email *</Label>
+                <Input
+                  id="coordinator_email"
+                  type="email"
+                  value={form.coordinator_email}
+                  onChange={(e) => setForm({ ...form, coordinator_email: e.target.value })}
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Social Media Requirements</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Will this event require social media coverage?</Label>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant={form.social_media_required ? 'default' : 'outline'}
+                    onClick={() => setForm({ ...form, social_media_required: true })}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!form.social_media_required ? 'default' : 'outline'}
+                    onClick={() => setForm({ ...form, social_media_required: false, social_media_channels: [] })}
+                  >
+                    No
+                  </Button>
+                </div>
+              </div>
+
+              {form.social_media_required && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Channels</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {SOCIAL_CHANNELS.map((channel) => (
+                        <Button
+                          key={channel}
+                          type="button"
+                          variant={form.social_media_channels.includes(channel) ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => toggleChannel(channel)}
+                        >
+                          {channel}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="social_media_requirements">Requirements</Label>
+                    <Textarea
+                      id="social_media_requirements"
+                      placeholder="Mention photographer needs, posting deadlines, approvals, and mandatory deliverables."
+                      rows={3}
+                      value={form.social_media_requirements}
+                      onChange={(e) => setForm({ ...form, social_media_requirements: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="social_media_caption">Suggested Caption / Talking Points</Label>
+                    <Textarea
+                      id="social_media_caption"
+                      placeholder="Draft the key message the NGO wants used in social media posts."
+                      rows={3}
+                      value={form.social_media_caption}
+                      onChange={(e) => setForm({ ...form, social_media_caption: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -195,13 +503,8 @@ export default function NewEventPage() {
             <div className="text-sm text-red-600 bg-red-50 rounded-md p-3">{error}</div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-3">
-            <Button
-              type="submit"
-              variant="outline"
-              loading={loading}
-            >
+            <Button type="submit" variant="outline" loading={loading}>
               Save as Draft
             </Button>
             <Button

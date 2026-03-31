@@ -37,6 +37,7 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
   rejected: 'Rejected',
   on_hold: 'On Hold',
   completed: 'Completed',
+  report_submitted: 'Report Submitted',
   archived: 'Archived',
 }
 
@@ -49,6 +50,7 @@ export const STATUS_COLORS: Record<EventStatus, string> = {
   rejected: 'bg-red-100 text-red-700',
   on_hold: 'bg-yellow-100 text-yellow-700',
   completed: 'bg-emerald-100 text-emerald-700',
+  report_submitted: 'bg-cyan-100 text-cyan-700',
   archived: 'bg-gray-100 text-gray-500',
 }
 

@@ -10,8 +10,13 @@ export async function POST(request: NextRequest) {
     const { path } = await request.json()
     if (!path) return NextResponse.json({ error: 'path required' }, { status: 400 })
 
-    // Ensure user can only get signed URLs for their own folder
-    if (!path.startsWith(user.id)) {
+    const { data: file, error: fileError } = await supabase
+      .from('files')
+      .select('id')
+      .eq('storage_path', path)
+      .single()
+
+    if (fileError || !file) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const EVENT_CODE_REGEX = /^[A-Z]{3}[A-Z]{3}[0-9]{2}$/
 
 serve(async (req) => {
   if (req.method !== 'POST') {
@@ -12,7 +13,6 @@ serve(async (req) => {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) return new Response('Unauthorized', { status: 401 })
 
-  // Verify user JWT
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
   const token = authHeader.replace('Bearer ', '')
 
@@ -23,7 +23,6 @@ serve(async (req) => {
     const { event_id } = await req.json()
     if (!event_id) return new Response('event_id required', { status: 400 })
 
-    // Validate event belongs to user and is in draft
     const { data: event, error: eventError } = await supabase
       .from('events')
       .select('*, budgets(*)')
@@ -36,14 +35,25 @@ serve(async (req) => {
       return new Response('Event not found or not in draft', { status: 404 })
     }
 
-    // Validation checks
     const errors: string[] = []
+    if (!event.event_code || !EVENT_CODE_REGEX.test(event.event_code)) errors.push('Event code must use the format MUMFEB01')
     if (!event.title?.trim()) errors.push('Title is required')
+    if (!event.goal?.trim()) errors.push('Goal is required')
     if (!event.event_date) errors.push('Event date is required')
-    if (!event.location?.trim()) errors.push('Location is required')
+    if (!event.location?.trim()) errors.push('Venue is required')
     if (!event.region?.trim()) errors.push('Region is required')
-    if (!event.budgets || event.budgets.length === 0) errors.push('At least one budget line is required')
-    if (event.expected_attendees <= 0) errors.push('Expected attendees must be greater than 0')
+    if (!event.coordinator_name?.trim()) errors.push('Coordinator name is required')
+    if (!event.coordinator_email?.trim()) errors.push('Coordinator email is required')
+    if (!event.expected_attendees || event.expected_attendees <= 0) errors.push('Expected participants must be greater than 0')
+    if (!event.requires_budget && !event.budget_justification?.trim()) {
+      errors.push('Budget justification is required when no budget is requested')
+    }
+    if (event.requires_budget && (!event.budgets || event.budgets.length === 0)) {
+      errors.push('At least one budget line is required')
+    }
+    if (event.social_media_required && (!event.social_media_channels || event.social_media_channels.length === 0)) {
+      errors.push('At least one social media channel is required when social media is requested')
+    }
 
     if (event.event_date) {
       const eventDate = new Date(event.event_date)
@@ -59,7 +69,6 @@ serve(async (req) => {
       })
     }
 
-    // Submit the event
     const { error: updateError } = await supabase
       .from('events')
       .update({

@@ -23,61 +23,64 @@ serve(async (req) => {
     const budgets = event.budgets ?? []
     const approvals = event.approvals ?? []
 
-    const totalEstimated = budgets.reduce((s: number, b: { estimated_amount: number }) => s + b.estimated_amount, 0)
-    const totalActual = budgets.reduce((s: number, b: { actual_amount?: number; estimated_amount: number }) => s + (b.actual_amount ?? b.estimated_amount), 0)
+    const totalEstimated = budgets.reduce((sum: number, line: { estimated_amount: number }) => sum + Number(line.estimated_amount || 0), 0)
+    const totalActual = budgets.reduce(
+      (sum: number, line: { actual_amount?: number; estimated_amount: number }) =>
+        sum + Number(line.actual_amount ?? line.estimated_amount ?? 0),
+      0
+    )
     const variance = totalActual - totalEstimated
-    const variancePct = totalEstimated > 0 ? ((variance / totalEstimated) * 100).toFixed(1) : '0'
+    const variancePct = totalEstimated > 0 ? ((variance / totalEstimated) * 100).toFixed(1) : '0.0'
 
-    const budgetHealth = Math.abs(Number(variancePct)) <= 10
-      ? 'GOOD (within 10%)'
-      : Number(variancePct) > 0
-        ? `OVER BUDGET (+${variancePct}%)`
-        : `UNDER BUDGET (${variancePct}%)`
-
-    const summary = `
-╔══════════════════════════════════════╗
-║         EVENT SUMMARY REPORT         ║
-╚══════════════════════════════════════╝
-
-EVENT INFORMATION
-─────────────────
-Title    : ${event.title}
-Region   : ${event.region}
-Location : ${event.location}
-Date     : ${event.event_date}${event.event_end_date ? ` to ${event.event_end_date}` : ''}
-Status   : ${event.status.toUpperCase()}
-Submitted by: ${(event.profiles as { full_name: string })?.full_name}
-
-ATTENDANCE
-──────────
-Expected  : ${event.expected_attendees}
-Actual    : ${report?.actual_attendees ?? 'Not reported'}
-${report?.actual_attendees ? `Variance  : ${report.actual_attendees - event.expected_attendees} (${(((report.actual_attendees - event.expected_attendees) / event.expected_attendees) * 100).toFixed(0)}%)` : ''}
-
-BUDGET
-──────
-Estimated : $${totalEstimated.toFixed(2)}
-Actual    : $${totalActual.toFixed(2)}
-Budget Health: ${budgetHealth}
-Line Items: ${budgets.length}
-
-APPROVAL CHAIN
-──────────────
-Stages Completed: ${approvals.length}/3
-${approvals.map((a: { stage: string; decision: string; decided_at: string }) =>
-  `  ✓ ${a.stage.replace(/_/g, ' ').toUpperCase()} — ${a.decision} (${new Date(a.decided_at).toLocaleDateString()})`
-).join('\n')}
-
-${report ? `OUTCOMES
-────────
-${report.outcome_summary || 'Not provided'}
-
-${report.challenges ? `CHALLENGES\n──────────\n${report.challenges}` : ''}
-
-${report.lessons_learned ? `LESSONS LEARNED\n───────────────\n${report.lessons_learned}` : ''}` : 'POST-EVENT REPORT: Not yet submitted'}
-
-Generated: ${new Date().toISOString()}
-`.trim()
+    const summary = [
+      'EVENT SUMMARY REPORT',
+      '====================',
+      `Event: ${event.event_code} - ${event.title}`,
+      `Goal: ${event.goal ?? 'Not specified'}`,
+      `Region: ${event.region}`,
+      `Planned Venue: ${event.location}`,
+      `Actual Venue: ${report?.actual_location ?? event.location}`,
+      `Dates: ${event.event_date}${event.event_end_date ? ` to ${event.event_end_date}` : ''}`,
+      `Time: ${event.start_time ?? 'TBD'} - ${event.end_time ?? 'TBD'}`,
+      `Actual Time: ${report?.actual_start_time ?? 'TBD'} - ${report?.actual_end_time ?? 'TBD'}`,
+      `Submitted by: ${(event.profiles as { full_name?: string })?.full_name ?? 'Unknown'}`,
+      '',
+      'ATTENDANCE',
+      `Expected: ${event.expected_attendees}`,
+      `Actual: ${report?.actual_attendees ?? 'Not reported'}`,
+      '',
+      'BUDGET',
+      `Estimated: $${totalEstimated.toFixed(2)}`,
+      `Actual: $${totalActual.toFixed(2)}`,
+      `Variance: $${variance.toFixed(2)} (${variancePct}%)`,
+      `Donations Received: $${Number(report?.donations_received ?? 0).toFixed(2)}`,
+      '',
+      'APPROVALS',
+      `Completed Stages: ${approvals.length}/3`,
+      ...approvals.map((approval: { stage: string; decision: string; decided_at: string }) =>
+        `- ${approval.stage}: ${approval.decision} on ${new Date(approval.decided_at).toISOString()}`
+      ),
+      '',
+      'EXECUTION',
+      report?.execution_details || 'Not provided',
+      '',
+      'OUTCOMES',
+      report?.outcome_summary || 'Not provided',
+      '',
+      'CHALLENGES',
+      report?.challenges || 'Not provided',
+      '',
+      'LESSONS LEARNED',
+      report?.lessons_learned || 'Not provided',
+      '',
+      'SOCIAL MEDIA',
+      report?.social_media_writeup || event.social_media_caption || 'Not provided',
+      '',
+      'FOLLOW-UP ACTIONS',
+      report?.follow_up_actions || 'Not provided',
+      '',
+      `Generated: ${new Date().toISOString()}`,
+    ].join('\n')
 
     await supabase
       .from('event_reports')

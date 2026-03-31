@@ -14,6 +14,7 @@ export type EventStatus =
   | 'rejected'
   | 'on_hold'
   | 'completed'
+  | 'report_submitted'
   | 'archived'
 
 export type ApprovalDecision = 'approved' | 'rejected' | 'on_hold'
@@ -40,13 +41,27 @@ export interface Profile {
 
 export interface Event {
   id: string
+  event_code: string
   title: string
   description: string | null
+  goal: string | null
   region: string
   event_date: string
   event_end_date: string | null
+  start_time: string | null
+  end_time: string | null
   location: string
   expected_attendees: number
+  participant_profile: string | null
+  coordinator_name: string | null
+  coordinator_phone: string | null
+  coordinator_email: string | null
+  requires_budget: boolean
+  budget_justification: string | null
+  social_media_required: boolean
+  social_media_channels: string[]
+  social_media_requirements: string | null
+  social_media_caption: string | null
   status: EventStatus
   created_by: string
   current_reviewer: UserRole | null
@@ -68,6 +83,7 @@ export interface Budget {
   event_id: string
   category: string
   description: string | null
+  justification: string | null
   estimated_amount: number
   actual_amount: number | null
   currency: string
@@ -127,10 +143,18 @@ export interface EventReport {
   event_id: string
   submitted_by: string
   actual_attendees: number | null
+  execution_details: string | null
   outcome_summary: string | null
   challenges: string | null
   lessons_learned: string | null
   budget_notes: string | null
+  social_media_writeup: string | null
+  donations_received: number
+  donation_notes: string | null
+  actual_start_time: string | null
+  actual_end_time: string | null
+  actual_location: string | null
+  follow_up_actions: string | null
   auto_summary: string | null
   submitted_at: string
   created_at: string

@@ -5,6 +5,7 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const APP_URL = Deno.env.get('APP_URL') || 'https://your-app.vercel.app'
+const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'NGO Events <onboarding@resend.dev>'
 
 serve(async (req) => {
   try {
@@ -75,7 +76,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'NGO Events <notifications@yourdomain.org>',
+        from: RESEND_FROM_EMAIL,
         to: profile.email,
         subject: notification.title,
         html: htmlBody,

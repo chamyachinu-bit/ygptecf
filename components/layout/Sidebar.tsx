@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -25,11 +26,45 @@ export function Sidebar({ profile, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [liveUnreadCount, setLiveUnreadCount] = useState(unreadCount)
+
+  useEffect(() => {
+    setLiveUnreadCount(unreadCount)
+  }, [unreadCount])
+
+  useEffect(() => {
+    const refreshUnreadCount = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('is_read', false)
+      setLiveUnreadCount(count ?? 0)
+    }
+
+    refreshUnreadCount()
+
+    const channel = supabase
+      .channel(`sidebar-notifications:${profile.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${profile.id}`,
+      }, () => {
+        refreshUnreadCount()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [profile.id, supabase])
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/events', label: 'Events', icon: Calendar },
-    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, badge: unreadCount },
+    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, badge: liveUnreadCount },
     ...(profile.role === 'admin' ? [
       { href: '/dashboard/admin/users', label: 'Users', icon: Users },
       { href: '/dashboard/admin/analytics', label: 'Analytics', icon: BarChart3 },

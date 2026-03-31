@@ -10,9 +10,10 @@ interface FileUploadProps {
   userId: string
   fileType: string
   onUploaded?: () => void
+  accept?: string
 }
 
-export function FileUpload({ eventId, userId, fileType, onUploaded }: FileUploadProps) {
+export function FileUpload({ eventId, userId, fileType, onUploaded, accept = '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp' }: FileUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
@@ -75,7 +76,7 @@ export function FileUpload({ eventId, userId, fileType, onUploaded }: FileUpload
           className="hidden"
           onChange={handleUpload}
           disabled={uploading}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+          accept={accept}
         />
       </label>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}

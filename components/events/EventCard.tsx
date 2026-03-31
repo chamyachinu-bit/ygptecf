@@ -18,6 +18,7 @@ export function EventCard({ event }: EventCardProps) {
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-green-700 mb-1">{event.event_code}</p>
               <h3 className="font-semibold text-gray-900 truncate">{event.title}</h3>
               {event.profiles && (
                 <p className="text-xs text-gray-500 mt-0.5">
