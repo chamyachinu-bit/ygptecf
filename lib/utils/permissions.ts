@@ -19,6 +19,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'notifications:read:own',
   ],
   events_team: [
+    'events:create',
     'events:read:submitted',
     'events:read:any',
     'history:read:any',
@@ -66,4 +67,5 @@ export const ROLE_REVIEWABLE_STATUSES: Partial<Record<UserRole, string[]>> = {
   events_team: ['submitted'],
   finance_team: ['events_approved'],
   accounts_team: ['finance_approved'],
+  admin: ['submitted', 'events_approved', 'finance_approved', 'on_hold', 'rejected', 'funded'],
 }

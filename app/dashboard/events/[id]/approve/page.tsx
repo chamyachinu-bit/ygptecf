@@ -12,7 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
 import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
-import type { Event, Profile, Approval, ApprovalComment } from '@/types/database'
+import type { Event, Profile, Approval, ApprovalComment, UserRole } from '@/types/database'
+
+const REVIEW_STAGES: UserRole[] = ['events_team', 'finance_team', 'accounts_team']
 
 export default function ApprovePage() {
   const params = useParams()
@@ -23,6 +25,7 @@ export default function ApprovePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [comments, setComments] = useState('')
   const [selectedDecision, setSelectedDecision] = useState<'approved' | 'rejected' | 'on_hold' | null>(null)
+  const [selectedStage, setSelectedStage] = useState<UserRole | null>(null)
   const [existingApproval, setExistingApproval] = useState<Approval | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -38,13 +41,25 @@ export default function ApprovePage() {
       ])
       setProfile(profileData)
       setEvent(eventData)
-      const matchedApproval = eventData?.approvals?.find((approval: Approval) => approval.stage === profileData?.role) ?? null
+      const defaultStage = profileData?.role === 'admin'
+        ? ((eventData?.current_reviewer as UserRole | null) || 'events_team')
+        : (profileData?.role as UserRole)
+      setSelectedStage(defaultStage)
+      const matchedApproval = eventData?.approvals?.find((approval: Approval) => approval.stage === defaultStage) ?? null
       setExistingApproval(matchedApproval)
       setSelectedDecision(matchedApproval?.decision ?? null)
       setComments('')
     }
     load()
   }, [id, supabase])
+
+  useEffect(() => {
+    if (!event || !selectedStage) return
+    const matchedApproval = event.approvals?.find((approval: Approval) => approval.stage === selectedStage) ?? null
+    setExistingApproval(matchedApproval)
+    setSelectedDecision(matchedApproval?.decision ?? null)
+    setComments('')
+  }, [event, selectedStage])
 
   const handleDecision = async (decision: 'approved' | 'rejected' | 'on_hold') => {
     if (!profile || !event) return
@@ -69,7 +84,7 @@ export default function ApprovePage() {
     const approvalPayload = {
       event_id: id,
       reviewer_id: user.id,
-      stage: profile.role,
+      stage: selectedStage ?? profile.role,
       decision,
       comments: comments.trim() || null,
     }
@@ -78,6 +93,8 @@ export default function ApprovePage() {
       ? await supabase
           .from('approvals')
           .update({
+            reviewer_id: user.id,
+            stage: selectedStage ?? profile.role,
             decision,
             comments: comments.trim() || null,
             decided_at: new Date().toISOString(),
@@ -110,7 +127,8 @@ export default function ApprovePage() {
     .slice()
     .sort((a: ApprovalComment, b: ApprovalComment) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  if (!canReview && !existingApproval) {
+  const adminCanReview = profile.role === 'admin'
+  if (!adminCanReview && !canReview && !existingApproval) {
     return (
       <div className="p-6">
         <Card>
@@ -172,7 +190,7 @@ export default function ApprovePage() {
         <Card>
           <CardHeader><CardTitle>Budget Breakdown</CardTitle></CardHeader>
           <CardContent>
-            <BudgetLineItems items={event.budgets ?? []} onChange={() => {}} readOnly />
+            <BudgetLineItems items={event.budgets ?? []} readOnly showActual={profile.role === 'accounts_team' || profile.role === 'finance_team' || profile.role === 'admin'} />
           </CardContent>
         </Card>
 
@@ -182,6 +200,21 @@ export default function ApprovePage() {
             <CardTitle>{existingApproval ? 'Revise Your Decision' : 'Your Decision'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {profile.role === 'admin' && (
+              <div className="space-y-1.5">
+                <Label>Approval Stage</Label>
+                <select
+                  value={selectedStage ?? ''}
+                  onChange={(e) => setSelectedStage(e.target.value as UserRole)}
+                  className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  {REVIEW_STAGES.map((stage) => (
+                    <option key={stage} value={stage}>{stage.replace('_', ' ')}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">Admin can act as an override reviewer for any approval stage.</p>
+              </div>
+            )}
             {existingApproval && (
               <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
                 Current saved decision: <strong>{existingApproval.decision}</strong>. If you change it, a new reason will be stored as a separate history note.

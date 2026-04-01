@@ -183,6 +183,48 @@ function toHtmlParagraphs(text: string) {
     .join('')
 }
 
+function getNotificationTheme(status?: string | null, title?: string, message?: string) {
+  const source = `${status ?? ''} ${title ?? ''} ${message ?? ''}`.toLowerCase()
+
+  if (source.includes('reject')) {
+    return {
+      accent: '#dc2626',
+      softBg: '#fef2f2',
+      softText: '#991b1b',
+      badge: 'Rejected',
+      buttonText: 'Review rejection details',
+    }
+  }
+
+  if (source.includes('hold') || source.includes('on_hold') || source.includes('on hold')) {
+    return {
+      accent: '#d97706',
+      softBg: '#fffbeb',
+      softText: '#92400e',
+      badge: 'On Hold',
+      buttonText: 'Review hold details',
+    }
+  }
+
+  if (source.includes('approved') || source.includes('funded')) {
+    return {
+      accent: '#16a34a',
+      softBg: '#f0fdf4',
+      softText: '#166534',
+      badge: 'Approved',
+      buttonText: `Open in ${APP_SHORT_NAME}`,
+    }
+  }
+
+  return {
+    accent: '#16a34a',
+    softBg: '#f0fdf4',
+    softText: '#166534',
+    badge: 'Update',
+    buttonText: `Open in ${APP_SHORT_NAME}`,
+  }
+}
+
 serve(async (req) => {
   try {
     const payload = await req.json()
@@ -260,26 +302,30 @@ serve(async (req) => {
     const renderedSubject = applyTemplate(templateSubject, variables)
     const renderedBody = applyTemplate(templateBody, variables)
     const deliveredTo = appSettings?.notification_test_email?.trim() || profile.email
+    const theme = getNotificationTheme(eventData?.status, notification.title, notification.message)
 
     const htmlBody = `
       <!DOCTYPE html>
       <html>
       <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111827;background:#f8fafc">
         <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px">
-          <div style="border-bottom:2px solid #16a34a;padding-bottom:16px;margin-bottom:24px">
+          <div style="border-bottom:2px solid ${theme.accent};padding-bottom:16px;margin-bottom:24px">
             <div style="display:flex;align-items:center;gap:12px">
               <img src="${APP_LOGO_URL}" alt="${APP_NAME}" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
               <div>
                 <p style="margin:0 0 6px;font-size:12px;letter-spacing:.08em;color:#6b7280;text-transform:uppercase">${APP_NAME}</p>
-                <h1 style="color:#16a34a;margin:0;font-size:22px">Workflow Notification</h1>
+                <h1 style="color:${theme.accent};margin:0;font-size:22px">Workflow Notification</h1>
               </div>
             </div>
+          </div>
+          <div style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;background:${theme.softBg};color:${theme.softText};font-size:12px;font-weight:700;letter-spacing:.02em;margin-bottom:18px">
+            ${theme.badge}
           </div>
           <h2 style="font-size:20px;margin:0 0 18px">${escapeHtml(renderedSubject)}</h2>
           ${toHtmlParagraphs(renderedBody)}
           <p style="margin-top:20px">
-            <a href="${eventLinkUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600">
-              Open in ${APP_SHORT_NAME}
+            <a href="${eventLinkUrl}" style="display:inline-block;background:${theme.accent};color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600">
+              ${theme.buttonText}
             </a>
           </p>
           ${appSettings?.media_drive_url ? `<p style="margin-top:14px"><a href="${appSettings.media_drive_url}" style="color:#2563eb;text-decoration:none">Open shared media drive</a></p>` : ''}

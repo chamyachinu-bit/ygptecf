@@ -394,14 +394,25 @@ export default function ReportPage() {
               </div>
 
               {userId && (
-                <div className="space-y-2">
-                  <Label>Images / Supporting Files</Label>
-                  <FileUpload
-                    eventId={id}
-                    userId={userId}
-                    fileType="report_image"
-                    accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Images / Supporting Files</Label>
+                    <FileUpload
+                      eventId={id}
+                      userId={userId}
+                      fileType="report_image"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Invoices / Receipts (Optional)</Label>
+                    <FileUpload
+                      eventId={id}
+                      userId={userId}
+                      fileType="invoice_document"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.xls,.xlsx"
+                    />
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -16,6 +16,7 @@ interface EventFilesPanelProps {
   uploadLabel?: string
   fileType?: string
   driveLink?: string | null
+  accept?: string
 }
 
 export function EventFilesPanel({
@@ -26,6 +27,7 @@ export function EventFilesPanel({
   uploadLabel = 'Supporting Files',
   fileType = 'proposal_attachment',
   driveLink,
+  accept,
 }: EventFilesPanelProps) {
   const router = useRouter()
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -66,6 +68,7 @@ export function EventFilesPanel({
             userId={userId}
             fileType={fileType}
             onUploaded={() => router.refresh()}
+            accept={accept}
           />
         )}
 

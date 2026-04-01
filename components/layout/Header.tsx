@@ -8,19 +8,22 @@ interface HeaderProps {
   title: string
   notifications?: Notification[]
   onMarkRead?: (id: string) => void
+  canCreate?: boolean
 }
 
-export function Header({ title, notifications = [], onMarkRead }: HeaderProps) {
+export function Header({ title, notifications = [], onMarkRead, canCreate = false }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
       <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
       <div className="flex items-center gap-3">
-        <Link href="/dashboard/events/new">
-          <Button size="sm" className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Event
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/events/new">
+            <Button size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              New Event
+            </Button>
+          </Link>
+        )}
         <Link href="/dashboard/notifications">
           <div className="relative">
             <button className="p-2 rounded-md hover:bg-gray-100 transition-colors">

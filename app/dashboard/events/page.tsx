@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { EventCard } from '@/components/events/EventCard'
-import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
+import { can, ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
 import type { Event } from '@/types/database'
 
 export default async function EventsPage() {
@@ -43,7 +43,7 @@ export default async function EventsPage() {
 
   return (
     <div>
-      <Header title="Events" />
+      <Header title="Events" canCreate={can(profile?.role ?? 'regional_coordinator', 'events:create')} />
       <div className="p-6 space-y-8">
         {/* Action needed section */}
         {profile?.role !== 'regional_coordinator' && (

@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AppBrand } from '@/components/branding/AppBrand'
-import type { UserRole } from '@/types/database'
+import type { RegionOption, UserRole } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils/permissions'
 import { APP_LOGO_URL, APP_NAME } from '@/lib/branding'
 
@@ -27,8 +27,18 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [regions, setRegions] = useState<RegionOption[]>([])
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    supabase
+      .from('regions')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .then(({ data }) => setRegions((data ?? []) as RegionOption[]))
+  }, [supabase])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,7 +73,7 @@ export default function RegisterPage() {
             <img src={APP_LOGO_URL} alt={APP_NAME} className="h-12 w-12 rounded-full object-cover mx-auto" />
             <h2 className="text-lg font-semibold">Check your email</h2>
             <p className="text-sm text-gray-600">
-              We sent a confirmation link to <strong>{form.email}</strong>. Click it to activate your account.
+              We sent a confirmation link to <strong>{form.email}</strong>. After verification, your account will wait for admin approval before dashboard access is enabled.
             </p>
             <Link href="/login">
               <Button variant="outline" className="w-full">Back to Login</Button>
@@ -134,16 +144,29 @@ export default function RegisterPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500">
-                  New accounts are created as Regional Coordinator. Admin and review roles should be assigned from Supabase after registration.
+                  New accounts are created as Regional Coordinator and must be approved by admin before use.
                 </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Region</Label>
-                <Input
-                  placeholder="e.g., East Africa, West Region..."
+                <select
                   value={form.region}
                   onChange={(e) => setForm({ ...form, region: e.target.value })}
-                />
+                  className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                >
+                  <option value="">Select region</option>
+                  {regions.map((region) => (
+                    <option key={region.id} value={region.name}>{region.name}</option>
+                  ))}
+                </select>
+                {regions.length === 0 && (
+                  <Input
+                    placeholder="e.g., Pune"
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                  />
+                )}
               </div>
               {error && (
                 <div className="text-sm text-red-600 bg-red-50 rounded-md p-3">{error}</div>

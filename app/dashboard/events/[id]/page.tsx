@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, MapPin, Users, Clock, Target } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Users, Clock, Target, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/events/StatusBadge'
@@ -9,7 +9,7 @@ import { ApprovalTimeline } from '@/components/events/ApprovalTimeline'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
 import { EventFilesPanel } from '@/components/events/EventFilesPanel'
 import { formatDate, formatRelative, formatCurrency } from '@/lib/utils/formatters'
-import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
+import { ROLE_REVIEWABLE_STATUSES, can } from '@/lib/utils/permissions'
 import type { Event, Approval, Budget, EventFile, EventReport } from '@/types/database'
 
 interface PageProps { params: Promise<{ id: string }> }
@@ -46,14 +46,19 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   const report = (event.event_reports?.[0] ?? null) as EventReport | null
   const files = (event.files ?? []) as EventFile[]
-  const proposalFiles = files.filter((file) => file.file_type !== 'report_image')
+  const proposalFiles = files.filter((file) => !['report_image', 'invoice_document'].includes(file.file_type))
   const reportFiles = files.filter((file) => file.file_type === 'report_image')
+  const invoiceFiles = files.filter((file) => file.file_type === 'invoice_document')
   const totalEstimated = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.estimated_amount || 0), 0)
   const totalActual = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.actual_amount || 0), 0)
 
   const reviewableStatuses = profile?.role ? ROLE_REVIEWABLE_STATUSES[profile.role as keyof typeof ROLE_REVIEWABLE_STATUSES] : undefined
   const hasExistingStageApproval = !!event.approvals?.some((a: Approval) => a.stage === profile.role)
-  const canApprove = !!profile && (!!reviewableStatuses?.includes(event.status) || hasExistingStageApproval)
+  const canApprove = !!profile && (
+    profile.role === 'admin' ||
+    !!reviewableStatuses?.includes(event.status) ||
+    hasExistingStageApproval
+  )
 
   const canSubmit = event.status === 'draft' && event.created_by === user.id
   const canEditProposal = event.created_by === user.id && ['draft', 'submitted', 'on_hold'].includes(event.status)
@@ -64,6 +69,8 @@ export default async function EventDetailPage({ params }: PageProps) {
   const canArchive = event.status === 'report_submitted' &&
     (event.created_by === user.id || profile?.role === 'admin')
   const canUploadProposalFiles = event.created_by === user.id && event.status === 'draft'
+  const canCreateEvents = profile?.role ? can(profile.role, 'events:create') : false
+  const canUploadInvoices = (event.created_by === user.id || profile?.role === 'admin') && ['draft', 'submitted', 'events_approved', 'finance_approved', 'funded', 'completed', 'report_submitted'].includes(event.status)
 
   return (
     <div>
@@ -110,6 +117,11 @@ export default async function EventDetailPage({ params }: PageProps) {
           {canArchive && (
             <ArchiveButton eventId={id} />
           )}
+          {report && (
+            <Link href={`/dashboard/events/${id}/final-report`}>
+              <Button size="sm" variant="outline">Final Report</Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -131,6 +143,12 @@ export default async function EventDetailPage({ params }: PageProps) {
                   <MapPin className="w-4 h-4 text-gray-400" />
                   <span>{event.location}</span>
                 </div>
+                {event.venue_gmaps_link && (
+                  <a href={event.venue_gmaps_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-green-700 hover:underline">
+                    <ExternalLink className="w-4 h-4 text-green-600" />
+                    <span>Open Google Maps</span>
+                  </a>
+                )}
                 <div className="flex items-center gap-2 text-gray-600">
                   <Calendar className="w-4 h-4 text-gray-400" />
                   <span>
@@ -219,10 +237,21 @@ export default async function EventDetailPage({ params }: PageProps) {
             files={proposalFiles}
             eventId={id}
             userId={user.id}
-            canUpload={canUploadProposalFiles}
+            canUpload={canUploadProposalFiles || (canCreateEvents && profile?.role === 'events_team' && event.created_by === user.id)}
             uploadLabel="Proposal Attachments"
             fileType="proposal_attachment"
             driveLink={appSettings?.media_drive_url}
+          />
+
+          <EventFilesPanel
+            files={invoiceFiles}
+            eventId={id}
+            userId={user.id}
+            canUpload={canUploadInvoices}
+            uploadLabel="Invoices / Finance Documents"
+            fileType="invoice_document"
+            driveLink={appSettings?.media_drive_url}
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.xls,.xlsx"
           />
 
           {report && (

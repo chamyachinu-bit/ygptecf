@@ -5,6 +5,11 @@ export type UserRole =
   | 'accounts_team'
   | 'admin'
 
+export type ProfileApprovalStatus =
+  | 'pending_admin_approval'
+  | 'approved'
+  | 'rejected'
+
 export type EventStatus =
   | 'draft'
   | 'submitted'
@@ -32,6 +37,9 @@ export interface Profile {
   email: string
   role: UserRole
   region: string | null
+  approval_status: ProfileApprovalStatus
+  approved_at?: string | null
+  approved_by?: string | null
   phone: string | null
   avatar_url: string | null
   is_active: boolean
@@ -51,6 +59,7 @@ export interface Event {
   start_time: string | null
   end_time: string | null
   location: string
+  venue_gmaps_link: string | null
   expected_attendees: number
   participant_profile: string | null
   coordinator_name: string | null
@@ -139,6 +148,14 @@ export interface EventFile {
   profiles?: Profile
 }
 
+export interface RegionOption {
+  id: string
+  name: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Notification {
   id: string
   user_id: string
@@ -166,6 +183,7 @@ export interface AppSettings {
   id: string
   media_drive_url: string | null
   notification_test_email: string | null
+  regions_note?: string | null
   created_at: string
   updated_at: string
 }

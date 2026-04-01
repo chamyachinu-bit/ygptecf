@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLineItems'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { can, ROLE_LABELS } from '@/lib/utils/permissions'
+import type { RegionOption, UserRole } from '@/types/database'
 
 const EVENT_CODE_REGEX = /^[A-Z]{3}[A-Z]{3}[0-9]{2}$/
 const GOALS = [
@@ -24,11 +26,21 @@ const GOALS = [
 ]
 const SOCIAL_CHANNELS = ['Facebook', 'Instagram', 'LinkedIn', 'WhatsApp', 'YouTube', 'Press']
 
+function buildPreviewCode(region: string, eventDate: string) {
+  const regionCode = region.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 3).padEnd(3, 'X')
+  const monthCode = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    : 'MON'
+  return `${regionCode}${monthCode}01`
+}
+
 export default function NewEventPage() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [profileRole, setProfileRole] = useState<UserRole | null>(null)
+  const [regions, setRegions] = useState<RegionOption[]>([])
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([
     { category: 'Venue', description: '', justification: '', estimated_amount: 0, actual_amount: null },
   ])
@@ -43,6 +55,7 @@ export default function NewEventPage() {
     start_time: '',
     end_time: '',
     location: '',
+    venue_gmaps_link: '',
     expected_attendees: '',
     participant_profile: '',
     coordinator_name: '',
@@ -63,11 +76,22 @@ export default function NewEventPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name, email, phone, region')
+        .select('full_name, email, phone, region, role')
         .eq('id', user.id)
         .single()
 
+      const { data: regionsData } = await supabase
+        .from('regions')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true })
+
       if (profile) {
+        setProfileRole(profile.role as UserRole)
+        if (!can(profile.role as UserRole, 'events:create')) {
+          router.replace('/dashboard')
+          return
+        }
         setForm((current) => ({
           ...current,
           coordinator_name: current.coordinator_name || profile.full_name || '',
@@ -76,10 +100,21 @@ export default function NewEventPage() {
           region: current.region || profile.region || '',
         }))
       }
+      setRegions((regionsData ?? []) as RegionOption[])
     }
 
     loadProfile()
-  }, [supabase])
+  }, [router, supabase])
+
+  useEffect(() => {
+    if (!form.region) return
+    const preview = buildPreviewCode(form.region, form.event_date)
+    if (profileRole !== 'admin') {
+      setForm((current) => ({ ...current, event_code: preview }))
+    } else if (!form.event_code) {
+      setForm((current) => ({ ...current, event_code: preview }))
+    }
+  }, [form.region, form.event_date, profileRole])
 
   const budgetLinesValid = useMemo(
     () => budgetLines.filter((line) => line.category && Number(line.estimated_amount) > 0),
@@ -111,6 +146,7 @@ export default function NewEventPage() {
       start_time: '10:00',
       end_time: '16:00',
       location: pickedVenue,
+      venue_gmaps_link: 'https://maps.google.com/?q=Shivajinagar+Community+Hall+Pune',
       expected_attendees: String(60 + (now.getSeconds() % 50)),
       participant_profile: 'Community volunteers, youth leaders, local NGO staff, and beneficiary representatives.',
       coordinator_name: current.coordinator_name || 'Nakul Kokate',
@@ -154,8 +190,14 @@ export default function NewEventPage() {
       return
     }
 
-    if (!EVENT_CODE_REGEX.test(eventCode)) {
+    if (profileRole === 'admin' && !EVENT_CODE_REGEX.test(eventCode)) {
       setError('Event code must use the format MUMFEB01.')
+      setLoading(false)
+      return
+    }
+
+    if (form.venue_gmaps_link && !/^https?:\/\/(www\.)?(maps\.google\.|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(form.venue_gmaps_link)) {
+      setError('Please enter a valid Google Maps link.')
       setLoading(false)
       return
     }
@@ -181,7 +223,7 @@ export default function NewEventPage() {
     const { data: event, error: eventError } = await supabase
       .from('events')
       .insert({
-        event_code: eventCode,
+        ...(profileRole === 'admin' ? { event_code: eventCode } : {}),
         title: form.title.trim(),
         description: form.description.trim() || null,
         goal: form.goal,
@@ -191,6 +233,7 @@ export default function NewEventPage() {
         start_time: form.start_time || null,
         end_time: form.end_time || null,
         location: form.location.trim(),
+        venue_gmaps_link: form.venue_gmaps_link.trim() || null,
         expected_attendees: parseInt(form.expected_attendees, 10) || 0,
         participant_profile: form.participant_profile.trim() || null,
         coordinator_name: form.coordinator_name.trim() || null,
@@ -237,6 +280,20 @@ export default function NewEventPage() {
     router.push(`/dashboard/events/${event.id}`)
   }
 
+  if (profileRole && !can(profileRole, 'events:create')) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600">
+              {ROLE_LABELS[profileRole]} does not have permission to create events.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
@@ -271,9 +328,14 @@ export default function NewEventPage() {
                     placeholder="MUMFEB01"
                     value={form.event_code}
                     onChange={(e) => setForm({ ...form, event_code: e.target.value.toUpperCase() })}
+                    readOnly={profileRole !== 'admin'}
                     required
                   />
-                  <p className="text-xs text-gray-500">Use the format `MUMFEB01`.</p>
+                  <p className="text-xs text-gray-500">
+                    {profileRole === 'admin'
+                      ? 'Admin can override the auto-generated code.'
+                      : 'This code is auto-generated from region and month.'}
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="goal">Goal *</Label>
@@ -313,13 +375,18 @@ export default function NewEventPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="region">Region *</Label>
-                  <Input
+                  <select
                     id="region"
-                    placeholder="e.g., Mumbai"
                     value={form.region}
                     onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     required
-                  />
+                  >
+                    <option value="">Select region</option>
+                    {regions.map((region) => (
+                      <option key={region.id} value={region.name}>{region.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="location">Venue / Location *</Label>
@@ -331,6 +398,16 @@ export default function NewEventPage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="venue_gmaps_link">Venue Google Maps Link</Label>
+                <Input
+                  id="venue_gmaps_link"
+                  placeholder="https://maps.google.com/..."
+                  value={form.venue_gmaps_link}
+                  onChange={(e) => setForm({ ...form, venue_gmaps_link: e.target.value })}
+                />
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">

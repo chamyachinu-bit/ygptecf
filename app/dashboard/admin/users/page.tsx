@@ -9,24 +9,39 @@ import type {
   NotificationTemplate,
   NotificationType,
   Profile,
+  ProfileApprovalStatus,
+  RegionOption,
   UserRole,
 } from '@/types/database'
 
 const ROLES: UserRole[] = ['regional_coordinator', 'events_team', 'finance_team', 'accounts_team', 'admin']
 const NOTIFICATION_TYPES: NotificationType[] = ['approval_required', 'status_changed', 'budget_flagged', 'event_reminder', 'report_due']
+const APPROVAL_STATUSES: ProfileApprovalStatus[] = ['pending_admin_approval', 'approved', 'rejected']
+
+function approvalLabel(status: ProfileApprovalStatus) {
+  switch (status) {
+    case 'approved':
+      return 'Approved'
+    case 'rejected':
+      return 'Rejected'
+    default:
+      return 'Pending Approval'
+  }
+}
 
 export default async function UsersPage() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  const adminUserId = user?.id
 
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: usersData }, { data: appSettings }, { data: templatesData }] = await Promise.all([
+  const [{ data: usersData }, { data: appSettings }, { data: templatesData }, { data: regionsData }] = await Promise.all([
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
     supabase.from('app_settings').select('*').eq('id', 'global').maybeSingle(),
     supabase
@@ -34,27 +49,39 @@ export default async function UsersPage() {
       .select('*')
       .order('recipient_role', { ascending: true })
       .order('notification_type', { ascending: true }),
+    supabase.from('regions').select('*').order('name', { ascending: true }),
   ])
 
   const users = (usersData ?? []) as Profile[]
   const settings = appSettings as AppSettings | null
   const templates = (templatesData ?? []) as NotificationTemplate[]
+  const regions = (regionsData ?? []) as RegionOption[]
 
   const byRole = users.reduce<Record<string, number>>((acc, entry) => {
     acc[entry.role] = (acc[entry.role] || 0) + 1
     return acc
   }, {})
 
-  async function updateUserRole(formData: FormData) {
+  async function updateUserAccess(formData: FormData) {
     'use server'
     const supabase = await createClient()
     const userId = String(formData.get('user_id') || '')
     const role = String(formData.get('role') || '') as UserRole
     const isActive = formData.get('is_active') === 'true'
+    const approvalStatus = String(formData.get('approval_status') || '') as ProfileApprovalStatus
 
-    if (!userId || !ROLES.includes(role)) return
+    if (!userId || !ROLES.includes(role) || !APPROVAL_STATUSES.includes(approvalStatus)) return
 
-    await supabase.from('profiles').update({ role, is_active: isActive }).eq('id', userId)
+    await supabase
+      .from('profiles')
+      .update({
+        role,
+        is_active: isActive,
+        approval_status: approvalStatus,
+        approved_at: approvalStatus === 'approved' ? new Date().toISOString() : null,
+        approved_by: approvalStatus === 'approved' ? adminUserId : null,
+      })
+      .eq('id', userId)
 
     revalidatePath('/dashboard/admin/users')
   }
@@ -64,15 +91,48 @@ export default async function UsersPage() {
     const supabase = await createClient()
     const mediaDriveUrl = String(formData.get('media_drive_url') || '').trim()
     const notificationTestEmail = String(formData.get('notification_test_email') || '').trim()
+    const regionsNote = String(formData.get('regions_note') || '').trim()
 
     await supabase.from('app_settings').upsert({
       id: 'global',
       media_drive_url: mediaDriveUrl || null,
       notification_test_email: notificationTestEmail || null,
+      regions_note: regionsNote || null,
     })
 
     revalidatePath('/dashboard/admin/users')
     revalidatePath('/dashboard/events')
+  }
+
+  async function addRegion(formData: FormData) {
+    'use server'
+    const supabase = await createClient()
+    const name = String(formData.get('region_name') || '').trim()
+    if (!name) return
+
+    await supabase.from('regions').upsert({
+      name,
+      is_active: true,
+    })
+
+    revalidatePath('/dashboard/admin/users')
+    revalidatePath('/register')
+    revalidatePath('/dashboard/events/new')
+  }
+
+  async function updateRegion(formData: FormData) {
+    'use server'
+    const supabase = await createClient()
+    const regionId = String(formData.get('region_id') || '')
+    const name = String(formData.get('name') || '').trim()
+    const isActive = formData.get('is_active') === 'true'
+    if (!regionId || !name) return
+
+    await supabase.from('regions').update({ name, is_active: isActive }).eq('id', regionId)
+
+    revalidatePath('/dashboard/admin/users')
+    revalidatePath('/register')
+    revalidatePath('/dashboard/events/new')
   }
 
   async function updateTemplate(formData: FormData) {
@@ -104,14 +164,14 @@ export default async function UsersPage() {
   return (
     <div>
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-xl font-semibold">User Management</h1>
+        <h1 className="text-xl font-semibold">Admin Control Center</h1>
         <p className="text-sm text-gray-500 mt-0.5">{users.length} total users</p>
       </div>
 
       <div className="p-6 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Media Drive Link & Email Test Routing</CardTitle>
+            <CardTitle>System Settings</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={updateSettings} className="space-y-3">
@@ -129,6 +189,13 @@ export default async function UsersPage() {
                 placeholder="kokatenakul111@gmail.com"
                 className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
               />
+              <textarea
+                name="regions_note"
+                defaultValue={settings?.regions_note ?? ''}
+                rows={2}
+                placeholder="Optional note shown to admins about region setup"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
               <div className="flex items-center gap-3">
                 <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
                   Save Settings
@@ -138,6 +205,52 @@ export default async function UsersPage() {
                 </p>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Region Master</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form action={addRegion} className="flex gap-3">
+              <input
+                type="text"
+                name="region_name"
+                placeholder="Add region, e.g. Pune"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+                Add Region
+              </button>
+            </form>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {regions.map((region) => (
+                <form key={region.id} action={updateRegion} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                  <input type="hidden" name="region_id" value={region.id} />
+                  <input
+                    type="text"
+                    name="name"
+                    defaultValue={region.name}
+                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <select
+                      name="is_active"
+                      defaultValue={region.is_active ? 'true' : 'false'}
+                      className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                    <button className="rounded-md border border-gray-300 px-3 py-2 text-xs font-medium hover:bg-gray-100">
+                      Save Region
+                    </button>
+                  </div>
+                </form>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -154,7 +267,7 @@ export default async function UsersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
+            <CardTitle>User Access & Approval</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -163,7 +276,7 @@ export default async function UsersPage() {
                   <tr className="border-b border-gray-100 text-left">
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role / RBAC</th>
+                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role / Approval</th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Region</th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Joined</th>
@@ -183,7 +296,7 @@ export default async function UsersPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-600">{entry.email}</td>
                       <td className="px-6 py-4">
-                        <form action={updateUserRole} className="space-y-2">
+                        <form action={updateUserAccess} className="space-y-2">
                           <input type="hidden" name="user_id" value={entry.id} />
                           <select
                             name="role"
@@ -197,6 +310,17 @@ export default async function UsersPage() {
                             ))}
                           </select>
                           <div className="flex items-center gap-2">
+                            <select
+                              name="approval_status"
+                              defaultValue={entry.approval_status}
+                              className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+                            >
+                              {APPROVAL_STATUSES.map((status) => (
+                                <option key={status} value={status}>
+                                  {approvalLabel(status)}
+                                </option>
+                              ))}
+                            </select>
                             <select
                               name="is_active"
                               defaultValue={entry.is_active ? 'true' : 'false'}
@@ -213,13 +337,26 @@ export default async function UsersPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-600">{entry.region || '—'}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${entry.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {entry.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                        <div className="space-y-2">
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                            entry.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {entry.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                            entry.approval_status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : entry.approval_status === 'rejected'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {approvalLabel(entry.approval_status)}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-gray-500 text-xs">{formatDate(entry.created_at)}</td>
                       <td className="px-6 py-4 text-xs text-gray-500">
-                        RBAC changes apply on the user&apos;s next refresh/login.
+                        Access changes apply on the user&apos;s next refresh/login.
                       </td>
                     </tr>
                   ))}

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLineItems'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import type { Event } from '@/types/database'
+import type { Event, RegionOption, UserRole } from '@/types/database'
 
 const EVENT_CODE_REGEX = /^[A-Z]{3}[A-Z]{3}[0-9]{2}$/
 const GOALS = [
@@ -25,6 +25,14 @@ const GOALS = [
 ]
 const SOCIAL_CHANNELS = ['Facebook', 'Instagram', 'LinkedIn', 'WhatsApp', 'YouTube', 'Press']
 
+function buildPreviewCode(region: string, eventDate: string) {
+  const regionCode = region.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 3).padEnd(3, 'X')
+  const monthCode = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    : 'MON'
+  return `${regionCode}${monthCode}01`
+}
+
 export default function EditEventPage() {
   const params = useParams()
   const id = params.id as string
@@ -33,6 +41,8 @@ export default function EditEventPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [event, setEvent] = useState<Event | null>(null)
+  const [profileRole, setProfileRole] = useState<UserRole | null>(null)
+  const [regions, setRegions] = useState<RegionOption[]>([])
   const [existingBudgetIds, setExistingBudgetIds] = useState<string[]>([])
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([])
   const [form, setForm] = useState({
@@ -46,6 +56,7 @@ export default function EditEventPage() {
     start_time: '',
     end_time: '',
     location: '',
+    venue_gmaps_link: '',
     expected_attendees: '',
     participant_profile: '',
     coordinator_name: '',
@@ -66,6 +77,19 @@ export default function EditEventPage() {
         .select('*, budgets(*)')
         .eq('id', id)
         .single()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setProfileRole((profile?.role ?? null) as UserRole | null)
+      }
+
+      const { data: regionsData } = await supabase
+        .from('regions')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true })
+      setRegions((regionsData ?? []) as RegionOption[])
 
       if (!data) return
       setEvent(data)
@@ -91,6 +115,7 @@ export default function EditEventPage() {
         start_time: data.start_time || '',
         end_time: data.end_time || '',
         location: data.location || '',
+        venue_gmaps_link: data.venue_gmaps_link || '',
         expected_attendees: data.expected_attendees?.toString() || '',
         participant_profile: data.participant_profile || '',
         coordinator_name: data.coordinator_name || '',
@@ -107,6 +132,13 @@ export default function EditEventPage() {
 
     load()
   }, [id, supabase])
+
+  useEffect(() => {
+    if (!event || !form.region || !form.event_date) return
+    if (profileRole !== 'admin') {
+      setForm((current) => ({ ...current, event_code: event.event_code || buildPreviewCode(current.region, current.event_date) }))
+    }
+  }, [event, form.region, form.event_date, profileRole])
 
   const budgetLinesValid = useMemo(
     () => budgetLines.filter((line) => line.category && Number(line.estimated_amount) > 0),
@@ -129,8 +161,14 @@ export default function EditEventPage() {
     setError('')
 
     const eventCode = form.event_code.trim().toUpperCase()
-    if (!EVENT_CODE_REGEX.test(eventCode)) {
+    if (profileRole === 'admin' && !EVENT_CODE_REGEX.test(eventCode)) {
       setError('Event code must use the format MUMFEB01.')
+      setLoading(false)
+      return
+    }
+
+    if (form.venue_gmaps_link && !/^https?:\/\/(www\.)?(maps\.google\.|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(form.venue_gmaps_link)) {
+      setError('Please enter a valid Google Maps link.')
       setLoading(false)
       return
     }
@@ -138,7 +176,7 @@ export default function EditEventPage() {
     const { error: eventError } = await supabase
       .from('events')
       .update({
-        event_code: eventCode,
+        ...(profileRole === 'admin' ? { event_code: eventCode } : {}),
         title: form.title.trim(),
         description: form.description.trim() || null,
         goal: form.goal,
@@ -148,6 +186,7 @@ export default function EditEventPage() {
         start_time: form.start_time || null,
         end_time: form.end_time || null,
         location: form.location.trim(),
+        venue_gmaps_link: form.venue_gmaps_link.trim() || null,
         expected_attendees: parseInt(form.expected_attendees, 10) || 0,
         participant_profile: form.participant_profile.trim() || null,
         coordinator_name: form.coordinator_name.trim() || null,
@@ -244,7 +283,7 @@ export default function EditEventPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Event Code *</Label>
-                  <Input value={form.event_code} onChange={(e) => setForm({ ...form, event_code: e.target.value.toUpperCase() })} required />
+                  <Input value={form.event_code} onChange={(e) => setForm({ ...form, event_code: e.target.value.toUpperCase() })} readOnly={profileRole !== 'admin'} required />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Goal *</Label>
@@ -268,12 +307,26 @@ export default function EditEventPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Region *</Label>
-                  <Input value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} required />
+                  <select
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  >
+                    <option value="">Select region</option>
+                    {regions.map((region) => (
+                      <option key={region.id} value={region.name}>{region.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Venue / Location *</Label>
                   <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} required />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Venue Google Maps Link</Label>
+                <Input value={form.venue_gmaps_link} onChange={(e) => setForm({ ...form, venue_gmaps_link: e.target.value })} placeholder="https://maps.google.com/..." />
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-1.5">
