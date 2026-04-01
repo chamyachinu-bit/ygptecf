@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLineItems'
 import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
+import { GeneratePdfButton } from '@/components/reports/PrintReportButton'
 import type { Event, EventReport } from '@/types/database'
 
 type ReportFormState = {
@@ -274,6 +275,9 @@ export default function ReportPage() {
               <Link href={`/dashboard/events/${id}/final-report`}>
                 <Button type="button" variant="outline">Open Final Report</Button>
               </Link>
+            )}
+            {existingReport && (
+              <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
             )}
             <Button type="button" variant="outline" onClick={handleAutofill}>
               Autofill Test Data
@@ -555,6 +559,9 @@ export default function ReportPage() {
                   <Link href={`/dashboard/events/${id}/final-report`}>
                     <Button type="button" variant="outline">Open Final Report</Button>
                   </Link>
+                )}
+                {existingReport && (
+                  <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
                 )}
                 <Button type="submit" loading={loading}>
                   {existingReport ? 'Update Event Completion Report' : 'Submit Event Completion Report'}

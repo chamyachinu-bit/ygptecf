@@ -23,6 +23,10 @@ type NotificationRecord = {
   title: string
   message: string
   email_sent: boolean
+  created_at?: string
+  email_delivery_key?: string | null
+  email_delivery_status?: string | null
+  email_delivery_attempts?: number | null
 }
 
 type ProfileRecord = {
@@ -248,6 +252,35 @@ function getNotificationTheme(status?: string | null, title?: string, message?: 
   }
 }
 
+async function createDeliveryKey(notification: NotificationRecord) {
+  const source = [
+    notification.user_id,
+    notification.event_id ?? '',
+    notification.type,
+    notification.title.trim(),
+    notification.message.trim(),
+  ].join('|')
+
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function logNotificationAudit(
+  supabase: ReturnType<typeof createClient>,
+  notification: NotificationRecord,
+  action: string,
+  details: Record<string, unknown>
+) {
+  await supabase.from('audit_logs').insert({
+    event_id: notification.event_id,
+    user_id: notification.user_id,
+    action,
+    new_value: details,
+  })
+}
+
 serve(async (req) => {
   try {
     const payload = await req.json()
@@ -262,6 +295,53 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const deliveryKey = notification.email_delivery_key ?? await createDeliveryKey(notification)
+
+    await supabase
+      .from('notifications')
+      .update({
+        email_delivery_key: deliveryKey,
+        email_delivery_status: 'sending',
+        email_delivery_attempts: (notification.email_delivery_attempts ?? 0) + 1,
+        email_last_attempted_at: new Date().toISOString(),
+        email_last_error: null,
+      })
+      .eq('id', notification.id)
+
+    const duplicateWindowStart = new Date(notification.created_at ?? new Date().toISOString())
+    duplicateWindowStart.setMinutes(duplicateWindowStart.getMinutes() - 10)
+
+    const { data: deliveredSibling } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('email_delivery_key', deliveryKey)
+      .eq('email_delivery_status', 'sent')
+      .neq('id', notification.id)
+      .gte('created_at', duplicateWindowStart.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (deliveredSibling) {
+      await supabase
+        .from('notifications')
+        .update({
+          email_sent: true,
+          email_delivery_key: deliveryKey,
+          email_delivery_status: 'duplicate_skipped',
+          email_sent_at: new Date().toISOString(),
+          email_last_error: `Duplicate delivery skipped; original notification ${deliveredSibling.id} already sent.`,
+        })
+        .eq('id', notification.id)
+
+      await logNotificationAudit(supabase, notification, 'notification_email_duplicate_skipped', {
+        notification_id: notification.id,
+        delivery_key: deliveryKey,
+        original_notification_id: deliveredSibling.id,
+      })
+
+      return new Response('Duplicate email skipped', { status: 200 })
+    }
 
     const [{ data: profile, error: profileError }, { data: appSettings }, { data: eventData }] = await Promise.all([
       supabase
@@ -383,6 +463,20 @@ serve(async (req) => {
       if (!appScriptRes.ok) {
         const err = await appScriptRes.text()
         console.error('Apps Script error:', err)
+        await supabase
+          .from('notifications')
+          .update({
+            email_delivery_key: deliveryKey,
+            email_delivery_status: 'failed',
+            email_last_error: err,
+          })
+          .eq('id', notification.id)
+        await logNotificationAudit(supabase, notification, 'notification_email_failed', {
+          notification_id: notification.id,
+          delivery_key: deliveryKey,
+          provider: 'apps_script',
+          error: err,
+        })
         return new Response(`Email failed: ${err}`, { status: 500 })
       }
     } else if (RESEND_API_KEY) {
@@ -403,16 +497,50 @@ serve(async (req) => {
       if (!emailRes.ok) {
         const err = await emailRes.text()
         console.error('Resend error:', err)
+        await supabase
+          .from('notifications')
+          .update({
+            email_delivery_key: deliveryKey,
+            email_delivery_status: 'failed',
+            email_last_error: err,
+          })
+          .eq('id', notification.id)
+        await logNotificationAudit(supabase, notification, 'notification_email_failed', {
+          notification_id: notification.id,
+          delivery_key: deliveryKey,
+          provider: 'resend',
+          error: err,
+        })
         return new Response(`Email failed: ${err}`, { status: 500 })
       }
     } else {
+      await supabase
+        .from('notifications')
+        .update({
+          email_delivery_key: deliveryKey,
+          email_delivery_status: 'failed',
+          email_last_error: 'No email provider configured',
+        })
+        .eq('id', notification.id)
       return new Response('No email provider configured', { status: 500 })
     }
 
     await supabase
       .from('notifications')
-      .update({ email_sent: true })
+      .update({
+        email_sent: true,
+        email_delivery_key: deliveryKey,
+        email_delivery_status: 'sent',
+        email_sent_at: new Date().toISOString(),
+        email_last_error: null,
+      })
       .eq('id', notification.id)
+
+    await logNotificationAudit(supabase, notification, 'notification_email_sent', {
+      notification_id: notification.id,
+      delivery_key: deliveryKey,
+      delivered_to: deliveredTo,
+    })
 
     return new Response('Email sent', { status: 200 })
   } catch (err) {

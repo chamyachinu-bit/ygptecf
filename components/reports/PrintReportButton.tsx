@@ -1,47 +1,36 @@
 'use client'
 
-import { useEffect } from 'react'
-import { Printer } from 'lucide-react'
+import { useState } from 'react'
+import { FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export function PrintReportButton({
-  href,
-  autoPrint = false,
-  label = 'Print / PDF',
-}: {
-  href?: string
-  autoPrint?: boolean
+interface GeneratePdfButtonProps {
+  href: string
   label?: string
-}) {
-  useEffect(() => {
-    if (!autoPrint) return
-    const timeout = window.setTimeout(() => {
-      window.print()
-    }, 300)
+}
 
-    return () => window.clearTimeout(timeout)
-  }, [autoPrint])
-
-  if (autoPrint) {
-    return (
-      <Button type="button" variant="outline" onClick={() => window.print()}>
-        <Printer className="mr-2 h-4 w-4" />
-        {label}
-      </Button>
-    )
-  }
+export function GeneratePdfButton({
+  href,
+  label = 'Generate PDF',
+}: GeneratePdfButtonProps) {
+  const [loading, setLoading] = useState(false)
 
   return (
     <Button
       type="button"
       variant="outline"
+      loading={loading}
       onClick={() => {
-        if (!href) return
-        window.open(href, '_blank', 'noopener,noreferrer')
+        setLoading(true)
+        const popup = window.open(href, '_blank', 'noopener,noreferrer')
+        popup?.focus()
+        window.setTimeout(() => setLoading(false), 1200)
       }}
     >
-      <Printer className="mr-2 h-4 w-4" />
-      {label}
+      {!loading && <FileDown className="mr-2 h-4 w-4" />}
+      {loading ? 'Preparing PDF...' : label}
     </Button>
   )
 }
+
+export { GeneratePdfButton as PrintReportButton }

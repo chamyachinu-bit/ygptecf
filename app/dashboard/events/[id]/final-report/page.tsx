@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { PrintReportButton } from '@/components/reports/PrintReportButton'
+import { GeneratePdfButton } from '@/components/reports/PrintReportButton'
+import { buildFinalReportViewModel } from '@/lib/reports/final-report-data'
 import { formatCurrency, formatDate } from '@/lib/utils/formatters'
 import type { Budget, EventReport, Profile } from '@/types/database'
 
@@ -59,30 +60,15 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
   if (!event || !profile) notFound()
 
   const report = (reportData ?? null) as EventReport | null
-  const budgets = (event.budgets ?? []) as Budget[]
-  const estimated = budgets.reduce((sum, line) => sum + Number(line.estimated_amount || 0), 0)
-  const actual = budgets.reduce((sum, line) => sum + Number(line.actual_amount || 0), 0)
-  const variance = actual - estimated
-  const actualAttendees = report?.actual_attendees ?? 0
-  const attendeeVariance = actualAttendees - Number(event.expected_attendees || 0)
-  const timingVariance =
-    report?.actual_start_time && event.start_time && report.actual_start_time !== event.start_time
-      ? `${event.start_time} planned / ${report.actual_start_time} actual`
-      : null
-
-  const driveLinks = [
-    { label: 'Proposal Folder', url: event.proposal_drive_url },
-    { label: 'Media Folder', url: event.media_drive_url },
-    { label: 'Report Folder', url: event.report_drive_url },
-    { label: 'Invoice Folder', url: event.invoice_drive_url },
-  ]
-
-  const timelineSteps = [
-    { label: 'Proposal Created', value: formatDate(event.created_at), done: true },
-    { label: 'Submitted', value: event.submitted_at ? formatDate(event.submitted_at) : 'Pending', done: !!event.submitted_at },
-    { label: 'Completed', value: event.completed_at ? formatDate(event.completed_at) : 'Pending', done: !!event.completed_at },
-    { label: 'Report Ready', value: report?.created_at ? formatDate(report.created_at) : 'Pending', done: !!report },
-  ]
+  const reportModel = report
+    ? buildFinalReportViewModel(
+        {
+          ...event,
+          budgets: (event.budgets ?? []) as Budget[],
+        },
+        report
+      )
+    : null
 
   if (!report) {
     return (
@@ -126,7 +112,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
   }
 
   return (
-    <div className={printMode ? 'print:bg-white' : ''}>
+    <div className={printMode ? 'bg-white print:bg-white' : ''}>
       <div className="border-b border-gray-200 bg-white px-6 py-4 print:hidden">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -149,20 +135,12 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                 <Button size="sm" variant={view === mode ? 'default' : 'outline'}>{label}</Button>
               </Link>
             ))}
-            <PrintReportButton href={`/dashboard/events/${id}/final-report?view=${view}&print=1`} />
+            <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
           </div>
         </div>
       </div>
 
       <div className={`mx-auto space-y-6 p-6 ${printMode ? 'max-w-6xl' : 'max-w-7xl'}`}>
-        {printMode && (
-          <div className="print:hidden flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm text-slate-600">
-              Print layout loaded. Your browser print dialog should open automatically. If it does not, use the button here.
-            </p>
-            <PrintReportButton autoPrint label="Print Now" />
-          </div>
-        )}
 
         {!printMode && (
           <Card className="border-green-200 bg-gradient-to-r from-green-50 via-white to-emerald-50">
@@ -175,38 +153,38 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                   <Button size="sm" variant={view === mode ? 'default' : 'outline'}>{label}</Button>
                 </Link>
               ))}
-              <PrintReportButton href={`/dashboard/events/${id}/final-report?view=${view}&print=1`} />
+              <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
               <p className="text-sm text-gray-600">
-                Use Comparison for leadership review, EPF for original proposal intent, ECR for actual field reporting, and Print / PDF for a cleaner export-ready layout.
+                Use Comparison for leadership review, EPF for original proposal intent, ECR for actual field reporting, and Generate PDF for a proper executive export document.
               </p>
             </CardContent>
           </Card>
         )}
 
-        <section className={`overflow-hidden rounded-3xl border border-gray-200 bg-white ${printMode ? '' : 'shadow-sm'}`}>
-          <div className="grid gap-6 bg-gradient-to-r from-slate-900 via-emerald-900 to-green-800 px-6 py-8 text-white lg:grid-cols-[1.4fr_1fr]">
+        <section className={`overflow-hidden rounded-3xl border border-gray-200 bg-white ${printMode ? 'report-print-shell' : 'shadow-sm'}`}>
+          <div className={`grid gap-6 px-6 py-8 lg:grid-cols-[1.4fr_1fr] ${printMode ? 'bg-white text-slate-900 border-b border-slate-200' : 'bg-gradient-to-r from-slate-900 via-emerald-900 to-green-800 text-white'}`}>
             <div className="space-y-4">
-              <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-wide text-white/90">
+              <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wide ${printMode ? 'bg-slate-100 text-slate-700' : 'bg-white/15 text-white/90'}`}>
                 YGPT EVENT final report
               </div>
               <div>
                 <h2 className="text-3xl font-semibold">{event.title}</h2>
-                <p className="mt-2 max-w-2xl text-sm text-emerald-50/90">
+                <p className={`mt-2 max-w-2xl text-sm ${printMode ? 'text-slate-600' : 'text-emerald-50/90'}`}>
                   This report compares the original event proposal with the actual execution outcome, helping leadership review delivery quality, participant reach, budget variance, and follow-up readiness in one place.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <HeroStat icon={<MapPin className="h-4 w-4" />} label="Region" value={event.region} />
-                <HeroStat icon={<CalendarDays className="h-4 w-4" />} label="Event Date" value={formatDate(event.event_date)} />
-                <HeroStat icon={<Users className="h-4 w-4" />} label="Expected vs Actual" value={`${event.expected_attendees} / ${actualAttendees}`} />
-                <HeroStat icon={<IndianRupee className="h-4 w-4" />} label="Budget" value={`${formatCurrency(estimated)} / ${formatCurrency(actual)}`} />
+                <HeroStat icon={<MapPin className="h-4 w-4" />} label="Region" value={event.region} printMode={printMode} />
+                <HeroStat icon={<CalendarDays className="h-4 w-4" />} label="Event Date" value={formatDate(event.event_date)} printMode={printMode} />
+                <HeroStat icon={<Users className="h-4 w-4" />} label="Expected vs Actual" value={`${event.expected_attendees} / ${reportModel?.actualAttendees ?? 0}`} printMode={printMode} />
+                <HeroStat icon={<IndianRupee className="h-4 w-4" />} label="Budget" value={`${formatCurrency(reportModel?.estimated ?? 0)} / ${formatCurrency(reportModel?.actual ?? 0)}`} printMode={printMode} />
               </div>
             </div>
-            <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/10 p-5 text-sm backdrop-blur">
-              <InsightRow title="Outcome direction" value={report.outcome_summary || 'Outcome summary not provided yet.'} />
-              <InsightRow title="Budget variance" value={`${variance > 0 ? 'Overspend' : variance < 0 ? 'Savings' : 'On plan'} of ${formatCurrency(Math.abs(variance))}`} />
-              <InsightRow title="Attendance variance" value={`${attendeeVariance >= 0 ? '+' : ''}${attendeeVariance} compared with proposal`} />
-              <InsightRow title="Venue used" value={report.actual_location || event.location} />
+            <div className={`grid gap-3 rounded-2xl p-5 text-sm ${printMode ? 'border border-slate-200 bg-slate-50' : 'border border-white/10 bg-white/10 backdrop-blur'}`}>
+              <InsightRow title="Outcome direction" value={report.outcome_summary || 'Outcome summary not provided yet.'} printMode={printMode} />
+              <InsightRow title="Budget variance" value={`${(reportModel?.variance ?? 0) > 0 ? 'Overspend' : (reportModel?.variance ?? 0) < 0 ? 'Savings' : 'On plan'} of ${formatCurrency(Math.abs(reportModel?.variance ?? 0))}`} printMode={printMode} />
+              <InsightRow title="Attendance variance" value={`${(reportModel?.attendeeVariance ?? 0) >= 0 ? '+' : ''}${reportModel?.attendeeVariance ?? 0} compared with proposal`} printMode={printMode} />
+              <InsightRow title="Venue used" value={report.actual_location || event.location} printMode={printMode} />
             </div>
           </div>
         </section>
@@ -215,20 +193,20 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
           <MetricCard
             icon={<TrendingUp className="h-4 w-4" />}
             title="Planned Budget"
-            value={formatCurrency(estimated)}
+            value={formatCurrency(reportModel?.estimated ?? 0)}
             tone="green"
           />
           <MetricCard
             icon={<IndianRupee className="h-4 w-4" />}
             title="Actual Budget"
-            value={formatCurrency(actual)}
+            value={formatCurrency(reportModel?.actual ?? 0)}
             tone="cyan"
           />
           <MetricCard
             icon={<Users className="h-4 w-4" />}
             title="Participant Change"
-            value={`${attendeeVariance >= 0 ? '+' : ''}${attendeeVariance}`}
-            tone={attendeeVariance >= 0 ? 'green' : 'amber'}
+            value={`${(reportModel?.attendeeVariance ?? 0) >= 0 ? '+' : ''}${reportModel?.attendeeVariance ?? 0}`}
+            tone={(reportModel?.attendeeVariance ?? 0) >= 0 ? 'green' : 'amber'}
           />
           <MetricCard
             icon={<CheckCircle2 className="h-4 w-4" />}
@@ -244,9 +222,9 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-4">
-              {timelineSteps.map((step, index) => (
+              {reportModel?.timelineSteps.map((step, index) => (
                 <div key={step.label} className="relative rounded-2xl border border-gray-200 bg-white p-4">
-                  {index < timelineSteps.length - 1 && (
+                  {index < (reportModel?.timelineSteps.length ?? 0) - 1 && (
                     <div className="absolute right-[-18px] top-1/2 hidden h-px w-8 -translate-y-1/2 bg-gray-300 md:block" />
                   )}
                   <div className={`mb-3 inline-flex h-8 w-8 items-center justify-center rounded-full ${step.done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -255,7 +233,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                   <p className="font-medium text-gray-900">{step.label}</p>
                   <p className="mt-1 text-sm text-gray-500">{step.value}</p>
                 </div>
-              ))}
+              )) ?? null}
             </div>
           </CardContent>
         </Card>
@@ -279,7 +257,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
               <LayerCard
                 title="What changed"
                 tone="amber"
-                body={buildChangeSummary(event, report, attendeeVariance, variance, timingVariance)}
+                body={reportModel?.changeSummary ?? 'No comparison summary available yet.'}
               />
             </CardContent>
           </Card>
@@ -289,7 +267,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
               <CardTitle>Supporting Drive Workspace</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {driveLinks.map((link) => (
+              {reportModel?.driveLinks.map((link) => (
                 <div key={link.label} className="rounded-xl border border-gray-200 p-3">
                   <p className="font-medium text-gray-900">{link.label}</p>
                   {link.url ? (
@@ -301,7 +279,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                     <p className="mt-2 text-gray-500">Drive routing not configured yet.</p>
                   )}
                 </div>
-              ))}
+              )) ?? null}
               {event.venue_gmaps_link && (
                 <a href={event.venue_gmaps_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-green-700 hover:underline">
                   <MapPin className="h-4 w-4" />
@@ -364,7 +342,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                       </tr>
                     </thead>
                     <tbody>
-                      {budgets.map((line) => {
+                      {reportModel?.budgets.map((line) => {
                         const lineVariance = Number(line.actual_amount || 0) - Number(line.estimated_amount || 0)
                         return (
                           <tr key={line.id} className="border-t border-gray-100">
@@ -376,14 +354,14 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                             </td>
                           </tr>
                         )
-                      })}
+                      }) ?? null}
                     </tbody>
                   </table>
                 </div>
                 <div className="grid gap-4 md:grid-cols-4">
-                  <MiniStat title="Planned" value={formatCurrency(estimated)} />
-                  <MiniStat title="Actual" value={formatCurrency(actual)} />
-                  <MiniStat title="Variance" value={formatCurrency(variance)} />
+                  <MiniStat title="Planned" value={formatCurrency(reportModel?.estimated ?? 0)} />
+                  <MiniStat title="Actual" value={formatCurrency(reportModel?.actual ?? 0)} />
+                  <MiniStat title="Variance" value={formatCurrency(reportModel?.variance ?? 0)} />
                   <MiniStat title="Donations" value={formatCurrency(report.donations_received ?? 0)} />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -431,54 +409,33 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
   )
 }
 
-function buildChangeSummary(
-  event: { location: string; expected_attendees: number; start_time?: string | null },
-  report: EventReport,
-  attendeeVariance: number,
-  budgetVariance: number,
-  timingVariance: string | null
-) {
-  const changes = [
-    attendeeVariance !== 0
-      ? `Attendance changed by ${attendeeVariance >= 0 ? '+' : ''}${attendeeVariance} compared with the proposal.`
-      : 'Attendance matched the proposal target closely.',
-    budgetVariance !== 0
-      ? `Budget variance was ${budgetVariance > 0 ? 'an overspend' : 'a saving'} of ${formatCurrency(Math.abs(budgetVariance))}.`
-      : 'Budget tracked exactly to plan.',
-    report.actual_location && report.actual_location !== event.location
-      ? `The actual venue changed from the proposal location.`
-      : 'The event was held at the planned location.',
-    timingVariance ? `Timing changed: ${timingVariance}.` : 'Timing stayed aligned with the proposal.',
-  ]
-
-  return changes.join(' ')
-}
-
 function HeroStat({
   icon,
   label,
   value,
+  printMode = false,
 }: {
   icon: ReactNode
   label: string
   value: string
+  printMode?: boolean
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-      <div className="mb-2 inline-flex items-center gap-2 text-emerald-50/90">
+    <div className={`rounded-2xl p-4 ${printMode ? 'border border-slate-200 bg-white' : 'border border-white/10 bg-white/10 backdrop-blur'}`}>
+      <div className={`mb-2 inline-flex items-center gap-2 ${printMode ? 'text-slate-500' : 'text-emerald-50/90'}`}>
         {icon}
         <span className="text-xs uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-lg font-semibold text-white">{value}</p>
+      <p className={`text-lg font-semibold ${printMode ? 'text-slate-900' : 'text-white'}`}>{value}</p>
     </div>
   )
 }
 
-function InsightRow({ title, value }: { title: string; value: string }) {
+function InsightRow({ title, value, printMode = false }: { title: string; value: string; printMode?: boolean }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-emerald-100/80">{title}</p>
-      <p className="mt-1 text-sm text-white">{value}</p>
+      <p className={`text-xs uppercase tracking-wide ${printMode ? 'text-slate-500' : 'text-emerald-100/80'}`}>{title}</p>
+      <p className={`mt-1 text-sm ${printMode ? 'text-slate-900' : 'text-white'}`}>{value}</p>
     </div>
   )
 }

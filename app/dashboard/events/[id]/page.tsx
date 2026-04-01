@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ApprovalTimeline } from '@/components/events/ApprovalTimeline'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
 import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
+import { GeneratePdfButton } from '@/components/reports/PrintReportButton'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { EmptyState, PageHero, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { formatCurrency, formatDate, formatRelative } from '@/lib/utils/formatters'
@@ -118,9 +119,12 @@ export default async function EventDetailPage({ params }: PageProps) {
               )}
               {canArchive && <ArchiveButton eventId={id} />}
               {report && (
-                <Link href={`/dashboard/events/${id}/final-report`}>
-                  <Button size="sm" variant="outline">Open Final Report</Button>
-                </Link>
+                <>
+                  <Link href={`/dashboard/events/${id}/final-report`}>
+                    <Button size="sm" variant="outline">Open Final Report</Button>
+                  </Link>
+                  <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
+                </>
               )}
             </div>
           }

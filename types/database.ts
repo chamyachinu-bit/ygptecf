@@ -178,6 +178,12 @@ export interface Notification {
   message: string
   is_read: boolean
   email_sent: boolean
+  email_delivery_key?: string | null
+  email_delivery_status?: string
+  email_delivery_attempts?: number
+  email_last_attempted_at?: string | null
+  email_sent_at?: string | null
+  email_last_error?: string | null
   created_at: string
 }
 
