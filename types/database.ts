@@ -78,6 +78,14 @@ export interface Event {
   completed_at: string | null
   is_budget_flagged: boolean
   flag_reason: string | null
+  drive_event_url?: string | null
+  proposal_drive_url?: string | null
+  media_drive_url?: string | null
+  report_drive_url?: string | null
+  invoice_drive_url?: string | null
+  drive_sync_status?: string
+  drive_sync_message?: string | null
+  drive_synced_at?: string | null
   created_at: string
   updated_at: string
   // Joined fields
@@ -152,6 +160,11 @@ export interface RegionOption {
   id: string
   name: string
   is_active: boolean
+  drive_root_url?: string | null
+  proposal_root_url?: string | null
+  media_root_url?: string | null
+  report_root_url?: string | null
+  invoice_root_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -184,6 +197,13 @@ export interface AppSettings {
   media_drive_url: string | null
   notification_test_email: string | null
   regions_note?: string | null
+  drive_apps_script_url?: string | null
+  drive_apps_script_secret?: string | null
+  drive_default_root_url?: string | null
+  drive_default_proposal_root_url?: string | null
+  drive_default_media_root_url?: string | null
+  drive_default_report_root_url?: string | null
+  drive_default_invoice_root_url?: string | null
   created_at: string
   updated_at: string
 }

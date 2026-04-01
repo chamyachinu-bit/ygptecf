@@ -92,12 +92,26 @@ export default async function UsersPage() {
     const mediaDriveUrl = String(formData.get('media_drive_url') || '').trim()
     const notificationTestEmail = String(formData.get('notification_test_email') || '').trim()
     const regionsNote = String(formData.get('regions_note') || '').trim()
+    const driveAppsScriptUrl = String(formData.get('drive_apps_script_url') || '').trim()
+    const driveAppsScriptSecret = String(formData.get('drive_apps_script_secret') || '').trim()
+    const driveDefaultRootUrl = String(formData.get('drive_default_root_url') || '').trim()
+    const driveDefaultProposalRootUrl = String(formData.get('drive_default_proposal_root_url') || '').trim()
+    const driveDefaultMediaRootUrl = String(formData.get('drive_default_media_root_url') || '').trim()
+    const driveDefaultReportRootUrl = String(formData.get('drive_default_report_root_url') || '').trim()
+    const driveDefaultInvoiceRootUrl = String(formData.get('drive_default_invoice_root_url') || '').trim()
 
     await supabase.from('app_settings').upsert({
       id: 'global',
       media_drive_url: mediaDriveUrl || null,
       notification_test_email: notificationTestEmail || null,
       regions_note: regionsNote || null,
+      drive_apps_script_url: driveAppsScriptUrl || null,
+      drive_apps_script_secret: driveAppsScriptSecret || null,
+      drive_default_root_url: driveDefaultRootUrl || null,
+      drive_default_proposal_root_url: driveDefaultProposalRootUrl || null,
+      drive_default_media_root_url: driveDefaultMediaRootUrl || null,
+      drive_default_report_root_url: driveDefaultReportRootUrl || null,
+      drive_default_invoice_root_url: driveDefaultInvoiceRootUrl || null,
     })
 
     revalidatePath('/dashboard/admin/users')
@@ -113,6 +127,11 @@ export default async function UsersPage() {
     await supabase.from('regions').upsert({
       name,
       is_active: true,
+      drive_root_url: String(formData.get('drive_root_url') || '').trim() || null,
+      proposal_root_url: String(formData.get('proposal_root_url') || '').trim() || null,
+      media_root_url: String(formData.get('media_root_url') || '').trim() || null,
+      report_root_url: String(formData.get('report_root_url') || '').trim() || null,
+      invoice_root_url: String(formData.get('invoice_root_url') || '').trim() || null,
     })
 
     revalidatePath('/dashboard/admin/users')
@@ -126,9 +145,22 @@ export default async function UsersPage() {
     const regionId = String(formData.get('region_id') || '')
     const name = String(formData.get('name') || '').trim()
     const isActive = formData.get('is_active') === 'true'
+    const driveRootUrl = String(formData.get('drive_root_url') || '').trim()
+    const proposalRootUrl = String(formData.get('proposal_root_url') || '').trim()
+    const mediaRootUrl = String(formData.get('media_root_url') || '').trim()
+    const reportRootUrl = String(formData.get('report_root_url') || '').trim()
+    const invoiceRootUrl = String(formData.get('invoice_root_url') || '').trim()
     if (!regionId || !name) return
 
-    await supabase.from('regions').update({ name, is_active: isActive }).eq('id', regionId)
+    await supabase.from('regions').update({
+      name,
+      is_active: isActive,
+      drive_root_url: driveRootUrl || null,
+      proposal_root_url: proposalRootUrl || null,
+      media_root_url: mediaRootUrl || null,
+      report_root_url: reportRootUrl || null,
+      invoice_root_url: invoiceRootUrl || null,
+    }).eq('id', regionId)
 
     revalidatePath('/dashboard/admin/users')
     revalidatePath('/register')
@@ -175,20 +207,75 @@ export default async function UsersPage() {
           </CardHeader>
           <CardContent>
             <form action={updateSettings} className="space-y-3">
-              <input
-                type="url"
-                name="media_drive_url"
-                defaultValue={settings?.media_drive_url ?? ''}
-                placeholder="https://drive.google.com/..."
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-              />
-              <input
-                type="email"
-                name="notification_test_email"
-                defaultValue={settings?.notification_test_email ?? ''}
-                placeholder="kokatenakul111@gmail.com"
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-              />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  type="url"
+                  name="drive_apps_script_url"
+                  defaultValue={settings?.drive_apps_script_url ?? ''}
+                  placeholder="Drive Apps Script webhook URL"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  name="drive_apps_script_secret"
+                  defaultValue={settings?.drive_apps_script_secret ?? ''}
+                  placeholder="Drive Apps Script shared secret"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  type="url"
+                  name="media_drive_url"
+                  defaultValue={settings?.media_drive_url ?? ''}
+                  placeholder="Fallback shared drive link"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="email"
+                  name="notification_test_email"
+                  defaultValue={settings?.notification_test_email ?? ''}
+                  placeholder="kokatenakul111@gmail.com"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  type="url"
+                  name="drive_default_root_url"
+                  defaultValue={settings?.drive_default_root_url ?? ''}
+                  placeholder="Default region/event root"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="url"
+                  name="drive_default_proposal_root_url"
+                  defaultValue={settings?.drive_default_proposal_root_url ?? ''}
+                  placeholder="Default proposal root"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="url"
+                  name="drive_default_media_root_url"
+                  defaultValue={settings?.drive_default_media_root_url ?? ''}
+                  placeholder="Default media root"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="url"
+                  name="drive_default_report_root_url"
+                  defaultValue={settings?.drive_default_report_root_url ?? ''}
+                  placeholder="Default report root"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="url"
+                  name="drive_default_invoice_root_url"
+                  defaultValue={settings?.drive_default_invoice_root_url ?? ''}
+                  placeholder="Default invoice root"
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm md:col-span-2"
+                />
+              </div>
               <textarea
                 name="regions_note"
                 defaultValue={settings?.regions_note ?? ''}
@@ -201,7 +288,7 @@ export default async function UsersPage() {
                   Save Settings
                 </button>
                 <p className="text-sm text-gray-500">
-                  Media link empty shows &quot;Coming soon&quot;. Test email override sends every notification to one inbox.
+                  Configure Drive automation here. If region-specific roots are missing, the app falls back to these defaults.
                 </p>
               </div>
             </form>
@@ -213,14 +300,44 @@ export default async function UsersPage() {
             <CardTitle>Region Master</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form action={addRegion} className="flex gap-3">
+            <form action={addRegion} className="grid gap-3 md:grid-cols-2">
               <input
                 type="text"
                 name="region_name"
                 placeholder="Add region, e.g. Pune"
                 className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
               />
-              <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+              <input
+                type="url"
+                name="drive_root_url"
+                placeholder="Region event root"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="url"
+                name="proposal_root_url"
+                placeholder="Proposal root"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="url"
+                name="media_root_url"
+                placeholder="Media root"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="url"
+                name="report_root_url"
+                placeholder="Report root"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="url"
+                name="invoice_root_url"
+                placeholder="Invoice root"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+              <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 md:col-span-2">
                 Add Region
               </button>
             </form>
@@ -235,6 +352,43 @@ export default async function UsersPage() {
                     defaultValue={region.name}
                     className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   />
+                  <input
+                    type="url"
+                    name="drive_root_url"
+                    defaultValue={region.drive_root_url ?? ''}
+                    placeholder="Region event root"
+                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  />
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <input
+                      type="url"
+                      name="proposal_root_url"
+                      defaultValue={region.proposal_root_url ?? ''}
+                      placeholder="Proposal root"
+                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="url"
+                      name="media_root_url"
+                      defaultValue={region.media_root_url ?? ''}
+                      placeholder="Media root"
+                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="url"
+                      name="report_root_url"
+                      defaultValue={region.report_root_url ?? ''}
+                      placeholder="Report root"
+                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="url"
+                      name="invoice_root_url"
+                      defaultValue={region.invoice_root_url ?? ''}
+                      placeholder="Invoice root"
+                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <select
                       name="is_active"

@@ -20,6 +20,7 @@ export default async function EventsPage() {
     .from('events')
     .select('*, profiles:created_by(full_name, email, region), budgets(*)')
     .order('created_at', { ascending: false })
+    .neq('status', 'archived')
 
   if (profile?.role === 'regional_coordinator') {
     query = query.eq('created_by', user.id)

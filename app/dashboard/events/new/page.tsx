@@ -277,6 +277,16 @@ export default function NewEventPage() {
       }
     }
 
+    try {
+      await fetch('/api/events/drive-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: event.id }),
+      })
+    } catch {
+      // The event should still be created even if Drive automation is not configured yet.
+    }
+
     router.push(`/dashboard/events/${event.id}`)
   }
 

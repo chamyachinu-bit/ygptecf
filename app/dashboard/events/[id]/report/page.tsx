@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileUpload } from '@/components/events/FileUpload'
 import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLineItems'
+import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
 import type { Event, EventReport } from '@/types/database'
 
 export default function ReportPage() {
@@ -336,6 +336,38 @@ export default function ReportPage() {
                 </div>
               </div>
 
+              {budgetLines.length > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 font-medium text-gray-500">Category</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Proposed</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Actual</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {budgetLines.map((line, index) => {
+                        const proposed = Number(line.estimated_amount) || 0
+                        const actual = Number(line.actual_amount) || 0
+                        const variance = actual - proposed
+                        return (
+                          <tr key={`${line.category}-${index}`} className="border-t border-gray-100">
+                            <td className="px-4 py-3 font-medium text-gray-900">{line.category}</td>
+                            <td className="px-4 py-3 text-gray-700">₹{proposed.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 text-gray-700">₹{actual.toLocaleString('en-IN')}</td>
+                            <td className={`px-4 py-3 font-medium ${variance > 0 ? 'text-red-600' : variance < 0 ? 'text-green-700' : 'text-gray-700'}`}>
+                              {variance > 0 ? '+' : ''}₹{variance.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Donations / Contributions Received</Label>
@@ -393,28 +425,19 @@ export default function ReportPage() {
                 />
               </div>
 
-              {userId && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Images / Supporting Files</Label>
-                    <FileUpload
-                      eventId={id}
-                      userId={userId}
-                      fileType="report_image"
-                      accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Invoices / Receipts (Optional)</Label>
-                    <FileUpload
-                      eventId={id}
-                      userId={userId}
-                      fileType="invoice_document"
-                      accept=".pdf,.jpg,.jpeg,.png,.webp,.xls,.xlsx"
-                    />
-                  </div>
-                </div>
-              )}
+              <DriveFoldersPanel
+                eventId={id}
+                title="Drive Report Workspace"
+                description="Use Drive folders for media, report evidence, and invoice documents. The app keeps the workflow and metadata while Drive holds the files."
+                folders={[
+                  { key: 'media', label: 'Media Folder', description: 'Upload event photos and media assets here.', url: event.media_drive_url },
+                  { key: 'report', label: 'Report Folder', description: 'Store final report evidence and supporting files here.', url: event.report_drive_url },
+                  { key: 'invoice', label: 'Invoice Folder', description: 'Store invoices, bills, and receipts here.', url: event.invoice_drive_url },
+                ]}
+                syncStatus={event.drive_sync_status}
+                syncMessage={event.drive_sync_message}
+                canRefresh={event.created_by === userId}
+              />
             </CardContent>
           </Card>
 

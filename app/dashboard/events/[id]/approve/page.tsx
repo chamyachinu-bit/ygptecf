@@ -11,10 +11,49 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
+import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
 import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
 import type { Event, Profile, Approval, ApprovalComment, UserRole } from '@/types/database'
 
 const REVIEW_STAGES: UserRole[] = ['events_team', 'finance_team', 'accounts_team']
+
+const REVIEWER_CONFIG: Record<UserRole, {
+  title: string
+  accent: string
+  summary: string
+  prompts: string[]
+}> = {
+  regional_coordinator: {
+    title: 'Coordinator Review',
+    accent: 'green',
+    summary: 'Coordinator role does not review approval stages directly.',
+    prompts: [],
+  },
+  events_team: {
+    title: 'Events Team Review Workspace',
+    accent: 'blue',
+    summary: 'Focus on proposal clarity, objective fit, venue readiness, and social/media execution feasibility.',
+    prompts: ['Is the event objective clear and practical?', 'Does the venue and participant setup look realistic?', 'Are the social/media requirements clear enough for delivery?'],
+  },
+  finance_team: {
+    title: 'Finance Review Workspace',
+    accent: 'violet',
+    summary: 'Focus on budget discipline, proposed versus likely actual cost, and donation/support visibility.',
+    prompts: ['Does the budget logic match the event scope?', 'Are there likely overspend or under-allocation areas?', 'Do the notes justify the requested funding clearly?'],
+  },
+  accounts_team: {
+    title: 'Accounts Final Review Workspace',
+    accent: 'amber',
+    summary: 'Focus on invoice/readiness, final release confidence, and post-event finance evidence.',
+    prompts: ['Will Accounts need invoice support later for this event?', 'Does the cost structure look ready for release and post-event reconciliation?', 'Are report and finance document routes clearly available?'],
+  },
+  admin: {
+    title: 'Admin Override Review Workspace',
+    accent: 'emerald',
+    summary: 'Admin can review or revise any stage with full visibility into history and support links.',
+    prompts: ['Use the stage selector when acting as an override reviewer.', 'Check prior reviewer notes before changing the workflow.', 'Use Drive links and event history to validate supporting evidence.'],
+  },
+}
 
 export default function ApprovePage() {
   const params = useParams()
@@ -126,6 +165,16 @@ export default function ApprovePage() {
   const decisionHistory = (existingApproval?.approval_comments ?? [])
     .slice()
     .sort((a: ApprovalComment, b: ApprovalComment) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const roleConfig = REVIEWER_CONFIG[profile.role]
+  const reviewTitle = profile.role === 'admin' && selectedStage
+    ? `${roleConfig.title} · ${selectedStage.replace('_', ' ')} stage`
+    : roleConfig.title
+  const driveFolders = [
+    { key: 'proposal', label: 'Proposal Folder', description: 'Original proposal support documents.', url: event.proposal_drive_url },
+    { key: 'media', label: 'Media Folder', description: 'Event media and communication assets.', url: event.media_drive_url },
+    { key: 'report', label: 'Report Folder', description: 'Completion evidence and report material.', url: event.report_drive_url },
+    { key: 'invoice', label: 'Invoice Folder', description: 'Invoices, receipts, and finance support files.', url: event.invoice_drive_url },
+  ]
 
   const adminCanReview = profile.role === 'admin'
   if (!adminCanReview && !canReview && !existingApproval) {
@@ -156,13 +205,29 @@ export default function ApprovePage() {
           </button>
         </Link>
         <div>
-          <h1 className="text-lg font-semibold">Review Event</h1>
+          <h1 className="text-lg font-semibold">{reviewTitle}</h1>
           <p className="text-xs text-gray-500">{event.title}</p>
         </div>
         <StatusBadge status={event.status} flagged={event.is_budget_flagged} />
       </div>
 
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <Card>
+          <CardHeader><CardTitle>Role Focus</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-gray-600">{roleConfig.summary}</p>
+            {roleConfig.prompts.length > 0 && (
+              <div className="grid gap-2 md:grid-cols-3">
+                {roleConfig.prompts.map((prompt) => (
+                  <div key={prompt} className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                    {prompt}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Event Summary */}
         <Card>
           <CardHeader><CardTitle>Event Summary</CardTitle></CardHeader>
@@ -189,10 +254,55 @@ export default function ApprovePage() {
         {/* Budget */}
         <Card>
           <CardHeader><CardTitle>Budget Breakdown</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <BudgetLineItems items={event.budgets ?? []} readOnly showActual={profile.role === 'accounts_team' || profile.role === 'finance_team' || profile.role === 'admin'} />
+            {(profile.role === 'finance_team' || profile.role === 'accounts_team' || profile.role === 'admin') && (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr className="text-left">
+                      <th className="px-4 py-3 font-medium text-gray-500">Category</th>
+                      <th className="px-4 py-3 font-medium text-gray-500">Proposed</th>
+                      <th className="px-4 py-3 font-medium text-gray-500">Actual</th>
+                      <th className="px-4 py-3 font-medium text-gray-500">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(event.budgets ?? []).map((line, index) => {
+                      const proposed = Number(line.estimated_amount) || 0
+                      const actual = Number(line.actual_amount) || 0
+                      const variance = actual - proposed
+                      return (
+                        <tr key={`${line.category}-${index}`} className="border-t border-gray-100">
+                          <td className="px-4 py-3 font-medium text-gray-900">{line.category}</td>
+                          <td className="px-4 py-3 text-gray-700">₹{proposed.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3 text-gray-700">₹{actual.toLocaleString('en-IN')}</td>
+                          <td className={`px-4 py-3 font-medium ${variance > 0 ? 'text-red-600' : variance < 0 ? 'text-green-700' : 'text-gray-700'}`}>
+                            {variance > 0 ? '+' : ''}₹{variance.toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        <DriveFoldersPanel
+          eventId={id}
+          title="Review Documents"
+          description="Reviewers can use these linked Drive folders to inspect proposal evidence, media, post-event reporting, and finance documents."
+          folders={
+            profile.role === 'events_team'
+              ? driveFolders.filter((folder) => ['proposal', 'media'].includes(folder.key))
+              : driveFolders
+          }
+          syncStatus={event.drive_sync_status}
+          syncMessage={event.drive_sync_message}
+          canRefresh={profile.role === 'admin'}
+        />
 
         {/* Decision */}
         <Card>

@@ -9,6 +9,7 @@ import {
   History,
   Users,
   BarChart3,
+  Archive,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/formatters'
@@ -70,6 +71,7 @@ export function Sidebar({ profile, unreadCount = 0 }: SidebarProps) {
     { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, badge: liveUnreadCount },
     ...(profile.role === 'admin' ? [
       { href: '/dashboard/admin/users', label: 'Users', icon: Users },
+      { href: '/dashboard/admin/archived', label: 'Archived', icon: Archive },
     ] : []),
   ]
 

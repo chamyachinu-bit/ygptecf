@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { ApprovalTimeline } from '@/components/events/ApprovalTimeline'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
-import { EventFilesPanel } from '@/components/events/EventFilesPanel'
+import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
 import { formatDate, formatRelative, formatCurrency } from '@/lib/utils/formatters'
 import { ROLE_REVIEWABLE_STATUSES, can } from '@/lib/utils/permissions'
 import type { Event, Approval, Budget, EventFile, EventReport } from '@/types/database'
@@ -36,19 +36,10 @@ export default async function EventDetailPage({ params }: PageProps) {
     .eq('id', id)
     .single()
 
-  const { data: appSettings } = await supabase
-    .from('app_settings')
-    .select('media_drive_url')
-    .eq('id', 'global')
-    .maybeSingle()
-
   if (!event) notFound()
 
   const report = (event.event_reports?.[0] ?? null) as EventReport | null
   const files = (event.files ?? []) as EventFile[]
-  const proposalFiles = files.filter((file) => !['report_image', 'invoice_document'].includes(file.file_type))
-  const reportFiles = files.filter((file) => file.file_type === 'report_image')
-  const invoiceFiles = files.filter((file) => file.file_type === 'invoice_document')
   const totalEstimated = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.estimated_amount || 0), 0)
   const totalActual = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.actual_amount || 0), 0)
 
@@ -66,11 +57,14 @@ export default async function EventDetailPage({ params }: PageProps) {
     (event.created_by === user.id || profile?.role === 'admin')
   const canReport = event.status === 'completed' && event.created_by === user.id
   const canEditReport = !!report && (event.created_by === user.id || profile?.role === 'admin') && ['completed', 'report_submitted', 'archived'].includes(event.status)
-  const canArchive = event.status === 'report_submitted' &&
-    (event.created_by === user.id || profile?.role === 'admin')
-  const canUploadProposalFiles = event.created_by === user.id && event.status === 'draft'
-  const canCreateEvents = profile?.role ? can(profile.role, 'events:create') : false
-  const canUploadInvoices = (event.created_by === user.id || profile?.role === 'admin') && ['draft', 'submitted', 'events_approved', 'finance_approved', 'funded', 'completed', 'report_submitted'].includes(event.status)
+  const canArchive = event.status === 'report_submitted' && profile?.role === 'admin'
+  const canRefreshDrive = event.created_by === user.id || profile?.role === 'admin'
+  const driveFolders = [
+    { key: 'proposal', label: 'Proposal Folder', description: 'Use this folder for proposal support documents.', url: event.proposal_drive_url },
+    { key: 'media', label: 'Media Folder', description: 'Use this folder for event photos, media, and social assets.', url: event.media_drive_url },
+    { key: 'report', label: 'Report Folder', description: 'Use this folder for completion-report evidence and supporting docs.', url: event.report_drive_url },
+    { key: 'invoice', label: 'Invoice Folder', description: 'Use this folder for invoices, receipts, and finance documents.', url: event.invoice_drive_url },
+  ]
 
   return (
     <div>
@@ -233,26 +227,30 @@ export default async function EventDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          <EventFilesPanel
-            files={proposalFiles}
+          <DriveFoldersPanel
             eventId={id}
-            userId={user.id}
-            canUpload={canUploadProposalFiles || (canCreateEvents && profile?.role === 'events_team' && event.created_by === user.id)}
-            uploadLabel="Proposal Attachments"
-            fileType="proposal_attachment"
-            driveLink={appSettings?.media_drive_url}
+            title="Drive Workspace"
+            description="This event now uses Google Drive as the source of truth for proposal, media, report, and invoice documents."
+            folders={driveFolders}
+            syncStatus={event.drive_sync_status}
+            syncMessage={event.drive_sync_message}
+            canRefresh={canRefreshDrive}
           />
 
-          <EventFilesPanel
-            files={invoiceFiles}
-            eventId={id}
-            userId={user.id}
-            canUpload={canUploadInvoices}
-            uploadLabel="Invoices / Finance Documents"
-            fileType="invoice_document"
-            driveLink={appSettings?.media_drive_url}
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.xls,.xlsx"
-          />
+          {files.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Legacy Uploaded Files</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="text-gray-500">These files were uploaded before the Drive-first workflow. New supporting documents should go into the Drive folders above.</p>
+                {files.map((file) => (
+                  <div key={file.id} className="rounded-md border border-gray-200 p-3">
+                    <p className="font-medium text-gray-900">{file.file_name}</p>
+                    <p className="text-xs text-gray-500">{file.file_type}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {report && (
             <>
@@ -295,14 +293,6 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
 
-              <EventFilesPanel
-                files={reportFiles}
-                eventId={id}
-                userId={user.id}
-                uploadLabel="Report Images & Attachments"
-                fileType="report_image"
-                driveLink={appSettings?.media_drive_url}
-              />
             </>
           )}
         </div>
@@ -373,10 +363,17 @@ function CompleteButton({ eventId }: { eventId: string }) {
       'use server'
       const { createClient: createSC } = await import('@/lib/supabase/server')
       const supabase = await createSC()
-      await supabase.from('events').update({
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const query = supabase.from('events').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
       }).eq('id', eventId)
+      if (profile?.role !== 'admin') {
+        query.eq('created_by', user.id)
+      }
+      await query
       const { redirect } = await import('next/navigation')
       redirect(`/dashboard/events/${eventId}`)
     }}>
