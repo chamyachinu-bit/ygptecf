@@ -45,8 +45,8 @@ Verify at: Dashboard → Storage → `event-files` bucket exists.
 ## STEP 4: Auth Configuration
 
 Dashboard → Authentication → URL Configuration:
-- Site URL: `http://localhost:3000` (update to Vercel URL after deploy)
-- Redirect URLs: Add `https://YOUR_APP.vercel.app/auth/callback`
+- Site URL: `https://ygptecf.vercel.app`
+- Redirect URLs: Add `https://ygptecf.vercel.app/auth/callback`
 
 Dashboard → Authentication → Providers → Email:
 - Enable email confirmations: OFF (for faster testing, turn ON for production)
@@ -73,7 +73,7 @@ npx supabase functions deploy submit-event
 # Set secrets
 npx supabase secrets set RESEND_API_KEY=re_YOUR_KEY
 npx supabase secrets set RESEND_FROM_EMAIL="NGO Events <onboarding@resend.dev>"
-npx supabase secrets set APP_URL=https://YOUR_APP.vercel.app
+npx supabase secrets set APP_URL=https://ygptecf.vercel.app
 
 # Optional: use Google Apps Script instead of Resend
 npx supabase secrets set APPS_SCRIPT_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
@@ -111,7 +111,7 @@ cp .env.local.example .env.local
 
 # Run dev server
 npm run dev
-# → http://localhost:3000
+# → https://ygptecf.vercel.app
 ```
 
 ---
@@ -134,7 +134,7 @@ git push -u origin main
    NEXT_PUBLIC_SUPABASE_URL     = https://xxxxx.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJ...
    SUPABASE_SERVICE_ROLE_KEY    = eyJ...
-   NEXT_PUBLIC_APP_URL          = https://your-app.vercel.app
+   NEXT_PUBLIC_APP_URL          = https://ygptecf.vercel.app
    ```
 5. Click Deploy
 
@@ -145,7 +145,7 @@ git push -u origin main
 1. Update Supabase Auth Site URL to your Vercel URL
 2. Update `APP_URL` secret in Supabase Edge Functions:
    ```bash
-   supabase secrets set APP_URL=https://YOUR_APP.vercel.app
+   supabase secrets set APP_URL=https://ygptecf.vercel.app
    ```
 
 ---
