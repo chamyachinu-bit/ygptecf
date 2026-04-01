@@ -115,7 +115,7 @@ export default async function EventDetailPage({ params }: PageProps) {
           )}
           {report && (
             <Link href={`/dashboard/events/${id}/final-report`}>
-              <Button size="sm" variant="outline">Final Report</Button>
+              <Button size="sm" variant="outline">Open Final Report</Button>
             </Link>
           )}
         </div>

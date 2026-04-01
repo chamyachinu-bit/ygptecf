@@ -196,7 +196,8 @@ export default function ReportPage() {
       body: JSON.stringify({ event_id: id }),
     }).catch(() => {})
 
-    router.push(`/dashboard/events/${id}`)
+    router.push(`/dashboard/events/${id}/final-report`)
+    router.refresh()
   }
 
   if (!event) {
@@ -221,7 +222,14 @@ export default function ReportPage() {
 
       <div className="p-6 max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {existingReport && (
+              <Link href={`/dashboard/events/${id}/final-report`}>
+                <Button type="button" variant="outline">
+                  Open Final Report
+                </Button>
+              </Link>
+            )}
             <Button type="button" variant="outline" onClick={handleAutofill}>
               Autofill Test Data
             </Button>
