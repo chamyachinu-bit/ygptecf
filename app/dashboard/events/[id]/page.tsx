@@ -23,22 +23,31 @@ export default async function EventDetailPage({ params }: PageProps) {
   const { data: profile } = await supabase
     .from('profiles').select('*').eq('id', user.id).single()
 
-  const { data: event } = await supabase
-    .from('events')
-    .select(`
-      *,
-      profiles:created_by(full_name, email, region, role),
-      budgets(*),
-      approvals(*, profiles:reviewer_id(full_name, role), approval_comments(*)),
-      files(*),
-      event_reports(*)
-    `)
-    .eq('id', id)
-    .single()
+  const [{ data: event }, { data: directReport }] = await Promise.all([
+    supabase
+      .from('events')
+      .select(`
+        *,
+        profiles:created_by(full_name, email, region, role),
+        budgets(*),
+        approvals(*, profiles:reviewer_id(full_name, role), approval_comments(*)),
+        files(*),
+        event_reports(*)
+      `)
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('event_reports')
+      .select('*')
+      .eq('event_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (!event) notFound()
 
-  const report = (event.event_reports?.[0] ?? null) as EventReport | null
+  const report = ((event.event_reports?.[0] ?? directReport) ?? null) as EventReport | null
   const files = (event.files ?? []) as EventFile[]
   const totalEstimated = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.estimated_amount || 0), 0)
   const totalActual = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.actual_amount || 0), 0)
@@ -296,6 +305,22 @@ export default async function EventDetailPage({ params }: PageProps) {
               </Card>
 
             </>
+          )}
+
+          {!report && ['completed', 'report_submitted', 'archived'].includes(event.status) && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardHeader><CardTitle>Final Report Not Ready Yet</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm text-amber-900">
+                <p>
+                  This event can have a final report, but no Event Completion Report data is available yet. Submit or update the ECR first, and the final report will become available automatically.
+                </p>
+                <div>
+                  <Link href={`/dashboard/events/${id}/report`}>
+                    <Button size="sm">Open Report Editor</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 
