@@ -58,10 +58,8 @@ export async function setupEventDriveLinks(eventId: string, actorUserId?: string
   const sharedSecret = normalizeUrl(settings?.drive_apps_script_secret)
   const roots = buildRoots(region, settings)
 
-  if (!webhookUrl || !sharedSecret || !hasAnyRoot(roots)) {
-    const message = !webhookUrl || !sharedSecret
-      ? 'Drive automation is not configured in admin settings.'
-      : `Drive routing is not configured for region ${event.region}.`
+  if (!webhookUrl || !sharedSecret) {
+    const message = 'Drive automation is not configured in admin settings.'
 
     await service
       .from('events')
@@ -84,6 +82,8 @@ export async function setupEventDriveLinks(eventId: string, actorUserId?: string
       region: event.region,
       event_date: event.event_date,
     },
+    automation_mode: hasAnyRoot(roots) ? 'use_roots' : 'script_managed',
+    fallback_shared_drive_url: normalizeUrl(settings?.media_drive_url),
     roots,
   }
 

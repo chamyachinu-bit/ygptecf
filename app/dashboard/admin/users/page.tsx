@@ -244,35 +244,35 @@ export default async function UsersPage() {
                   type="url"
                   name="drive_default_root_url"
                   defaultValue={settings?.drive_default_root_url ?? ''}
-                  placeholder="Default region/event root"
+                  placeholder="Advanced override: default region/event root"
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
                 <input
                   type="url"
                   name="drive_default_proposal_root_url"
                   defaultValue={settings?.drive_default_proposal_root_url ?? ''}
-                  placeholder="Default proposal root"
+                  placeholder="Advanced override: default proposal root"
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
                 <input
                   type="url"
                   name="drive_default_media_root_url"
                   defaultValue={settings?.drive_default_media_root_url ?? ''}
-                  placeholder="Default media root"
+                  placeholder="Advanced override: default media root"
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
                 <input
                   type="url"
                   name="drive_default_report_root_url"
                   defaultValue={settings?.drive_default_report_root_url ?? ''}
-                  placeholder="Default report root"
+                  placeholder="Advanced override: default report root"
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
                 <input
                   type="url"
                   name="drive_default_invoice_root_url"
                   defaultValue={settings?.drive_default_invoice_root_url ?? ''}
-                  placeholder="Default invoice root"
+                  placeholder="Advanced override: default invoice root"
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm md:col-span-2"
                 />
               </div>
@@ -288,7 +288,7 @@ export default async function UsersPage() {
                   Save Settings
                 </button>
                 <p className="text-sm text-gray-500">
-                  Configure Drive automation here. If region-specific roots are missing, the app falls back to these defaults.
+                  One-click mode only needs the Apps Script URL and shared secret. The Drive root fields below are optional advanced overrides if you want the app to steer certain regions or document types into specific parent folders.
                 </p>
               </div>
             </form>

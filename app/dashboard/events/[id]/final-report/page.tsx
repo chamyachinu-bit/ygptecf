@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, FileText, LineChart } from 'lucide-react'
+import { ArrowLeft, ExternalLink, LineChart } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate } from '@/lib/utils/formatters'
@@ -91,6 +91,27 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
       </div>
 
       <div className={`mx-auto space-y-6 p-6 ${printMode ? 'max-w-6xl' : 'max-w-5xl'}`}>
+        {!printMode && (
+          <Card className="border-green-200 bg-green-50/60">
+            <CardHeader>
+              <CardTitle>Report Views</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-2">
+              {Object.entries(VIEW_LABELS).map(([mode, label]) => (
+                <Link key={`body-${mode}`} href={`/dashboard/events/${id}/final-report?view=${mode}`}>
+                  <Button size="sm" variant={view === mode ? 'default' : 'outline'}>{label}</Button>
+                </Link>
+              ))}
+              <Link href={`/dashboard/events/${id}/final-report?view=${view}&print=1`}>
+                <Button size="sm" variant="outline">Printable Layout</Button>
+              </Link>
+              <p className="text-sm text-gray-600">
+                Switch between the comparison view, original EPF, submitted ECR, or the printable combined layout.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Executive Summary</CardTitle>

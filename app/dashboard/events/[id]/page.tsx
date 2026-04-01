@@ -53,8 +53,10 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   const canSubmit = event.status === 'draft' && event.created_by === user.id
   const canEditProposal = event.created_by === user.id && ['draft', 'submitted', 'on_hold'].includes(event.status)
-  const canComplete = event.status === 'funded' &&
-    (event.created_by === user.id || profile?.role === 'admin')
+  const canComplete = event.status === 'funded' && (
+    profile?.role === 'admin' ||
+    (profile?.role === 'regional_coordinator' && event.created_by === user.id)
+  )
   const canReport = event.status === 'completed' && event.created_by === user.id
   const canEditReport = !!report && (event.created_by === user.id || profile?.role === 'admin') && ['completed', 'report_submitted', 'archived'].includes(event.status)
   const canArchive = event.status === 'report_submitted' && profile?.role === 'admin'
@@ -366,11 +368,13 @@ function CompleteButton({ eventId }: { eventId: string }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (!profile) return
+      if (profile.role !== 'admin' && profile.role !== 'regional_coordinator') return
       const query = supabase.from('events').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
       }).eq('id', eventId)
-      if (profile?.role !== 'admin') {
+      if (profile.role !== 'admin') {
         query.eq('created_by', user.id)
       }
       await query
