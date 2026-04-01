@@ -3,38 +3,54 @@ import { Bell, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import type { Notification } from '@/types/database'
+import { PageHero } from '@/components/ui/page-shell'
 
 interface HeaderProps {
   title: string
+  subtitle?: string
+  eyebrow?: string
   notifications?: Notification[]
   onMarkRead?: (id: string) => void
   canCreate?: boolean
 }
 
-export function Header({ title, notifications = [], onMarkRead, canCreate = false }: HeaderProps) {
+export function Header({ title, subtitle, eyebrow, notifications = [], onMarkRead, canCreate = false }: HeaderProps) {
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-      <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-      <div className="flex items-center gap-3">
-        {canCreate && (
-          <Link href="/dashboard/events/new">
-            <Button size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Event
-            </Button>
-          </Link>
-        )}
-        <Link href="/dashboard/notifications">
-          <div className="relative">
-            <button className="p-2 rounded-md hover:bg-gray-100 transition-colors">
-              <Bell className="w-5 h-5 text-gray-600" />
+    <PageHero
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      actions={
+        <>
+          {canCreate && (
+            <Link href="/dashboard/events/new">
+              <Button size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Event
+              </Button>
+            </Link>
+          )}
+          <Link href="/dashboard/notifications">
+            <button className="relative rounded-xl border border-white/15 bg-white/10 p-2.5 text-white/90 transition-colors hover:bg-white/20">
+              <Bell className="h-5 w-5" />
               {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-red-400" />
               )}
             </button>
-          </div>
-        </Link>
+          </Link>
+        </>
+      }
+    >
+      <div className="grid gap-3 text-sm text-emerald-50/90">
+        <p>
+          Use this workspace to stay on top of approvals, reporting, budgeting, and operational follow-up.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.14em] text-emerald-100/80">
+          <span>Production workspace</span>
+          <span>Role-aware visibility</span>
+          <span>Drive-linked operations</span>
+        </div>
       </div>
-    </header>
+    </PageHero>
   )
 }

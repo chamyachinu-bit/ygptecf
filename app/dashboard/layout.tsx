@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Sidebar } from '@/components/layout/Sidebar'
+import { MobileNavigation, Sidebar } from '@/components/layout/Sidebar'
 import type { Profile } from '@/types/database'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -25,9 +25,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('is_read', false)
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-transparent">
       <Sidebar profile={profile as Profile} unreadCount={count ?? 0} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-24 lg:pb-0">
+        <MobileNavigation profile={profile as Profile} unreadCount={count ?? 0} />
         {children}
       </main>
     </div>

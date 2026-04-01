@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/utils/formatters'
 import type { EventStatus } from '@/types/database'
 
@@ -9,13 +8,13 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, flagged }: StatusBadgeProps) {
   return (
-    <div className="flex items-center gap-2">
-      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[status]}`}>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${STATUS_COLORS[status]}`}>
         {STATUS_LABELS[status]}
       </span>
       {flagged && (
-        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700">
-          ⚠ Budget Flagged
+        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-100/90 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+          Budget Flagged
         </span>
       )}
     </div>

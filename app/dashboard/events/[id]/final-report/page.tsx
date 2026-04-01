@@ -11,12 +11,12 @@ import {
   FileText,
   IndianRupee,
   MapPin,
-  Printer,
   TrendingUp,
   Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { PrintReportButton } from '@/components/reports/PrintReportButton'
 import { formatCurrency, formatDate } from '@/lib/utils/formatters'
 import type { Budget, EventReport, Profile } from '@/types/database'
 
@@ -149,17 +149,21 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                 <Button size="sm" variant={view === mode ? 'default' : 'outline'}>{label}</Button>
               </Link>
             ))}
-            <Link href={`/dashboard/events/${id}/final-report?view=${view}&print=1`}>
-              <Button size="sm" variant="outline">
-                <Printer className="mr-2 h-4 w-4" />
-                Print / PDF
-              </Button>
-            </Link>
+            <PrintReportButton href={`/dashboard/events/${id}/final-report?view=${view}&print=1`} />
           </div>
         </div>
       </div>
 
       <div className={`mx-auto space-y-6 p-6 ${printMode ? 'max-w-6xl' : 'max-w-7xl'}`}>
+        {printMode && (
+          <div className="print:hidden flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm text-slate-600">
+              Print layout loaded. Your browser print dialog should open automatically. If it does not, use the button here.
+            </p>
+            <PrintReportButton autoPrint label="Print Now" />
+          </div>
+        )}
+
         {!printMode && (
           <Card className="border-green-200 bg-gradient-to-r from-green-50 via-white to-emerald-50">
             <CardHeader>
@@ -171,9 +175,7 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
                   <Button size="sm" variant={view === mode ? 'default' : 'outline'}>{label}</Button>
                 </Link>
               ))}
-              <Link href={`/dashboard/events/${id}/final-report?view=${view}&print=1`}>
-                <Button size="sm" variant="outline">Print / PDF</Button>
-              </Link>
+              <PrintReportButton href={`/dashboard/events/${id}/final-report?view=${view}&print=1`} />
               <p className="text-sm text-gray-600">
                 Use Comparison for leadership review, EPF for original proposal intent, ECR for actual field reporting, and Print / PDF for a cleaner export-ready layout.
               </p>

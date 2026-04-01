@@ -1,22 +1,23 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useEffect, useState } from 'react'
+
+import { useEffect, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { Bell, Calendar, CheckCheck, AlertTriangle, DollarSign } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import { Header } from '@/components/layout/Header'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { formatRelative } from '@/lib/utils/formatters'
-import { Bell, CheckCheck, AlertTriangle, Calendar, DollarSign } from 'lucide-react'
-import Link from 'next/link'
 import type { NotificationType } from '@/types/database'
 
-const TYPE_ICONS: Record<NotificationType, React.ReactNode> = {
-  approval_required: <Calendar className="w-4 h-4 text-blue-500" />,
-  status_changed: <CheckCheck className="w-4 h-4 text-green-500" />,
-  budget_flagged: <DollarSign className="w-4 h-4 text-orange-500" />,
-  event_reminder: <Bell className="w-4 h-4 text-purple-500" />,
-  report_due: <AlertTriangle className="w-4 h-4 text-red-500" />,
+const TYPE_ICONS: Record<NotificationType, ReactNode> = {
+  approval_required: <Calendar className="h-4 w-4 text-blue-500" />,
+  status_changed: <CheckCheck className="h-4 w-4 text-green-500" />,
+  budget_flagged: <DollarSign className="h-4 w-4 text-orange-500" />,
+  event_reminder: <Bell className="h-4 w-4 text-violet-500" />,
+  report_due: <AlertTriangle className="h-4 w-4 text-red-500" />,
 }
 
 export default function NotificationsPage() {
@@ -25,59 +26,87 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null))
-  }, [])
+  }, [supabase])
 
   const { notifications, markRead, markAllRead } = useNotifications(userId)
 
+  const stats = [
+    { label: 'Unread', value: String(notifications.length), helper: 'Current inbox items' },
+    { label: 'Approvals', value: String(notifications.filter((item) => item.type === 'approval_required').length), helper: 'Review-related updates' },
+    { label: 'Status Changes', value: String(notifications.filter((item) => item.type === 'status_changed').length), helper: 'Workflow movement alerts' },
+    { label: 'Warnings', value: String(notifications.filter((item) => ['budget_flagged', 'report_due'].includes(item.type)).length), helper: 'Items worth immediate attention' },
+  ]
+
   return (
     <div>
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Notifications</h1>
-        {notifications.length > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllRead}>
-            Mark all read
-          </Button>
-        )}
-      </div>
-      <div className="p-6 max-w-2xl mx-auto space-y-3">
-        {notifications.length === 0 ? (
-          <div className="text-center py-16">
-            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No unread notifications</p>
-          </div>
-        ) : (
-          notifications.map((n) => (
-            <Card key={n.id} className="border-l-4 border-l-green-500">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">{TYPE_ICONS[n.type]}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                    <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-xs text-gray-400">{formatRelative(n.created_at)}</span>
-                      {n.event_id && (
-                        <Link
-                          href={`/dashboard/events/${n.event_id}`}
-                          className="text-xs text-green-600 hover:underline"
+      <Header
+        title="Notifications"
+        subtitle="Stay on top of approvals, status updates, reporting deadlines, and workflow alerts from one executive-style inbox."
+        eyebrow="Inbox"
+      />
+      <PageShell>
+        <StatGrid>
+          {stats.map((card) => (
+            <StatCard key={card.label} label={card.label} value={card.value} helper={card.helper} />
+          ))}
+        </StatGrid>
+
+        <SectionBlock
+          title="Notification inbox"
+          subtitle="Unread items are kept here until you dismiss them or mark the full inbox as read."
+          actions={
+            notifications.length > 0 ? (
+              <Button variant="outline" size="sm" onClick={markAllRead}>
+                Mark all read
+              </Button>
+            ) : undefined
+          }
+        >
+          {notifications.length === 0 ? (
+            <EmptyState
+              title="No unread notifications"
+              message="Your inbox is clear. Workflow updates, approval requests, and deadline reminders will appear here automatically."
+            />
+          ) : (
+            <div className="space-y-4">
+              {notifications.map((notification) => (
+                <div key={notification.id} className="rounded-[1.4rem] border border-slate-200/80 bg-white/95 p-5 shadow-[0_16px_32px_rgba(15,23,42,0.05)]">
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50">
+                      {TYPE_ICONS[notification.type]}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{notification.message}</p>
+                        </div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">{formatRelative(notification.created_at)}</p>
+                      </div>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {notification.event_id && (
+                          <Link
+                            href={`/dashboard/events/${notification.event_id}`}
+                            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-slate-100"
+                          >
+                            Open Event →
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => markRead(notification.id)}
+                          className="text-xs font-medium text-slate-500 hover:text-slate-800"
                         >
-                          View Event →
-                        </Link>
-                      )}
+                          Dismiss
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => markRead(n.id)}
-                    className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0"
-                  >
-                    Dismiss
-                  </button>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </SectionBlock>
+      </PageShell>
     </div>
   )
 }

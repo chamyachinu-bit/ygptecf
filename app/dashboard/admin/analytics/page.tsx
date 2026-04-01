@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdvancedAnalytics } from '@/components/dashboard/AdvancedAnalytics'
+import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { can, ROLE_LABELS } from '@/lib/utils/permissions'
 import { formatCurrency } from '@/lib/utils/formatters'
 import type { Event, EventReport, EventStatus, Profile, UserRole } from '@/types/database'
@@ -249,9 +250,18 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div>
-      <Header title="Leadership Analysis Center" canCreate={can(profile.role, 'events:create')} />
-      <div className="space-y-6 p-6">
-        <Card>
+      <Header
+        title="Leadership Analysis Center"
+        subtitle="Study the event pipeline, finance movement, reporting quality, and operational health with role-aware visibility."
+        eyebrow="Analytics"
+        canCreate={can(profile.role, 'events:create')}
+      />
+      <PageShell>
+        <SectionBlock
+          title="Analysis Scope"
+          subtitle="Filter by month, region, status, goal, or free-text search to compare operating windows cleanly."
+        >
+        <Card className="rounded-[1.5rem] border-slate-200/80">
           <CardHeader>
             <CardTitle>Analysis Scope</CardTitle>
           </CardHeader>
@@ -298,18 +308,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </form>
           </CardContent>
         </Card>
+        </SectionBlock>
 
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+        <StatGrid className="xl:grid-cols-3">
           {summaryCards.map((card) => (
-            <Card key={card.label}>
-              <CardContent className="space-y-1 p-5">
-                <p className="text-xs uppercase tracking-wide text-gray-500">{card.label}</p>
-                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
-                <p className="text-xs text-gray-500">{card.helper}</p>
-              </CardContent>
-            </Card>
+            <StatCard key={card.label} label={card.label} value={card.value} helper={card.helper} />
           ))}
-        </div>
+        </StatGrid>
 
         <div className="grid gap-6 xl:grid-cols-3">
           <Card className="xl:col-span-2">
@@ -360,12 +365,19 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </Card>
         </div>
 
-        <AdvancedAnalytics
-          monthlyData={monthlyData}
-          statusData={statusData}
-          regionData={regionData}
-          goalData={goalData}
-        />
+        {filteredRows.length === 0 ? (
+          <EmptyState
+            title="No analytics rows match the current filters"
+            message="Try widening the month, region, status, or goal filters to bring events back into scope."
+          />
+        ) : (
+          <AdvancedAnalytics
+            monthlyData={monthlyData}
+            statusData={statusData}
+            regionData={regionData}
+            goalData={goalData}
+          />
+        )}
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card>
@@ -480,7 +492,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </table>
           </CardContent>
         </Card>
-      </div>
+      </PageShell>
     </div>
   )
 }

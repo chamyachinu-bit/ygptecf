@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { formatDate, formatRelative } from '@/lib/utils/formatters'
+import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 
 export default async function ArchivedEventsPage() {
   const supabase = await createClient()
@@ -25,9 +26,23 @@ export default async function ArchivedEventsPage() {
 
   return (
     <div>
-      <Header title="Archived Events" />
-      <div className="space-y-6 p-6">
-        <Card>
+      <Header
+        title="Archived Events"
+        subtitle="Browse completed records that have moved out of the live pipeline while still retaining their final reports, history, and Drive links."
+        eyebrow="Archive"
+      />
+      <PageShell>
+        <StatGrid className="xl:grid-cols-3">
+          <StatCard label="Archived events" value={String((events ?? []).length)} helper="Records removed from the active workflow" />
+          <StatCard label="Drive-ready" value={String((events ?? []).filter((event) => event.drive_sync_status === 'ready').length)} helper="Events with synced folder links" />
+          <StatCard label="Needs attention" value={String((events ?? []).filter((event) => event.drive_sync_status !== 'ready').length)} helper="Check sync message or refresh links" />
+        </StatGrid>
+
+        <SectionBlock
+          title="Archive Workspace"
+          subtitle="Archived events stay readable with their final report, comparison views, Drive links, and audit history."
+        >
+        <Card className="rounded-[1.5rem] border-slate-200/80">
           <CardHeader>
             <CardTitle>Archive Workspace</CardTitle>
           </CardHeader>
@@ -37,7 +52,14 @@ export default async function ArchivedEventsPage() {
             </p>
           </CardContent>
         </Card>
+        </SectionBlock>
 
+        {(events ?? []).length === 0 ? (
+          <EmptyState
+            title="No archived events yet"
+            message="Once admins archive a completed record, it will appear here with the final report and support links intact."
+          />
+        ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(events ?? []).map((event) => (
             <Card key={event.id}>
@@ -67,7 +89,8 @@ export default async function ArchivedEventsPage() {
             </Card>
           ))}
         </div>
-      </div>
+        )}
+      </PageShell>
     </div>
   )
 }

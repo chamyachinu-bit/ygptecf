@@ -1,48 +1,48 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, MapPin, Users, Clock, Target, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, ExternalLink, MapPin, Target, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/events/StatusBadge'
 import { ApprovalTimeline } from '@/components/events/ApprovalTimeline'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
 import { DriveFoldersPanel } from '@/components/events/DriveFoldersPanel'
-import { formatDate, formatRelative, formatCurrency } from '@/lib/utils/formatters'
-import { ROLE_REVIEWABLE_STATUSES, can } from '@/lib/utils/permissions'
-import type { Event, Approval, Budget, EventFile, EventReport } from '@/types/database'
+import { StatusBadge } from '@/components/events/StatusBadge'
+import { EmptyState, PageHero, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
+import { formatCurrency, formatDate, formatRelative } from '@/lib/utils/formatters'
+import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
+import type { Approval, Budget, EventFile, EventReport } from '@/types/database'
 
-interface PageProps { params: Promise<{ id: string }> }
+interface PageProps {
+  params: Promise<{ id: string }>
+}
 
 export default async function EventDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles').select('*').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
   const [{ data: event }, { data: directReport }] = await Promise.all([
     supabase
       .from('events')
-      .select(`
+      .select(
+        `
         *,
         profiles:created_by(full_name, email, region, role),
         budgets(*),
         approvals(*, profiles:reviewer_id(full_name, role), approval_comments(*)),
         files(*),
         event_reports(*)
-      `)
+      `
+      )
       .eq('id', id)
       .single(),
-    supabase
-      .from('event_reports')
-      .select('*')
-      .eq('event_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from('event_reports').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   if (!event) notFound()
@@ -51,334 +51,296 @@ export default async function EventDetailPage({ params }: PageProps) {
   const files = (event.files ?? []) as EventFile[]
   const totalEstimated = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.estimated_amount || 0), 0)
   const totalActual = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.actual_amount || 0), 0)
-
   const reviewableStatuses = profile?.role ? ROLE_REVIEWABLE_STATUSES[profile.role as keyof typeof ROLE_REVIEWABLE_STATUSES] : undefined
-  const hasExistingStageApproval = !!event.approvals?.some((a: Approval) => a.stage === profile.role)
-  const canApprove = !!profile && (
-    profile.role === 'admin' ||
-    !!reviewableStatuses?.includes(event.status) ||
-    hasExistingStageApproval
-  )
-
+  const hasExistingStageApproval = !!event.approvals?.some((approval: Approval) => approval.stage === profile?.role)
+  const canApprove = !!profile && (profile.role === 'admin' || !!reviewableStatuses?.includes(event.status) || hasExistingStageApproval)
   const canSubmit = event.status === 'draft' && event.created_by === user.id
   const canEditProposal = event.created_by === user.id && ['draft', 'submitted', 'on_hold'].includes(event.status)
-  const canComplete = event.status === 'funded' && (
-    profile?.role === 'admin' ||
-    (profile?.role === 'regional_coordinator' && event.created_by === user.id)
-  )
+  const canComplete = event.status === 'funded' && (profile?.role === 'admin' || (profile?.role === 'regional_coordinator' && event.created_by === user.id))
   const canReport = event.status === 'completed' && event.created_by === user.id
   const canEditReport = !!report && (event.created_by === user.id || profile?.role === 'admin') && ['completed', 'report_submitted', 'archived'].includes(event.status)
   const canArchive = event.status === 'report_submitted' && profile?.role === 'admin'
   const canRefreshDrive = event.created_by === user.id || profile?.role === 'admin'
+
   const driveFolders = [
-    { key: 'proposal', label: 'Proposal Folder', description: 'Use this folder for proposal support documents.', url: event.proposal_drive_url },
-    { key: 'media', label: 'Media Folder', description: 'Use this folder for event photos, media, and social assets.', url: event.media_drive_url },
-    { key: 'report', label: 'Report Folder', description: 'Use this folder for completion-report evidence and supporting docs.', url: event.report_drive_url },
-    { key: 'invoice', label: 'Invoice Folder', description: 'Use this folder for invoices, receipts, and finance documents.', url: event.invoice_drive_url },
+    { key: 'proposal', label: 'Proposal Folder', description: 'Proposal documents and supporting planning files.', url: event.proposal_drive_url },
+    { key: 'media', label: 'Media Folder', description: 'Photos, videos, captions, and media outputs.', url: event.media_drive_url },
+    { key: 'report', label: 'Report Folder', description: 'Completion evidence and report support material.', url: event.report_drive_url },
+    { key: 'invoice', label: 'Invoice Folder', description: 'Invoices, receipts, and finance documents.', url: event.invoice_drive_url },
+  ]
+
+  const eventSummary = [
+    { icon: <Target className="h-4 w-4" />, label: 'Goal', value: event.goal || 'General event' },
+    { icon: <MapPin className="h-4 w-4" />, label: 'Venue', value: event.location },
+    { icon: <Calendar className="h-4 w-4" />, label: 'Dates', value: `${formatDate(event.event_date)}${event.event_end_date ? ` -> ${formatDate(event.event_end_date)}` : ''}` },
+    { icon: <Clock className="h-4 w-4" />, label: 'Time', value: `${event.start_time || 'TBD'} - ${event.end_time || 'TBD'}` },
+    { icon: <Users className="h-4 w-4" />, label: 'Expected attendance', value: `${event.expected_attendees}` },
   ]
 
   return (
     <div>
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/events">
-            <button className="p-1.5 rounded hover:bg-gray-100">
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-lg font-semibold">{event.event_code} · {event.title}</h1>
-            <p className="text-xs text-gray-500">{formatRelative(event.created_at)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <StatusBadge status={event.status} flagged={event.is_budget_flagged} />
-          {canApprove && (
-            <Link href={`/dashboard/events/${id}/approve`}>
-              <Button size="sm">Review & Approve</Button>
+      <PageShell>
+        <PageHero
+          lead={
+            <Link href="/dashboard/events">
+              <Button size="sm" variant="secondary" className="border border-white/80 bg-white text-slate-900 shadow-lg hover:bg-slate-100">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Events
+              </Button>
             </Link>
-          )}
-          {canSubmit && (
-            <SubmitButton eventId={id} />
-          )}
-          {canEditProposal && (
-            <Link href={`/dashboard/events/${id}/edit`}>
-              <Button size="sm" variant="outline">Edit Proposal</Button>
-            </Link>
-          )}
-          {canComplete && (
-            <CompleteButton eventId={id} />
-          )}
-          {canReport && (
-            <Link href={`/dashboard/events/${id}/report`}>
-              <Button size="sm" variant="outline">Submit Report</Button>
-            </Link>
-          )}
-          {canEditReport && (
-            <Link href={`/dashboard/events/${id}/report`}>
-              <Button size="sm" variant="outline">View / Edit Report</Button>
-            </Link>
-          )}
-          {canArchive && (
-            <ArchiveButton eventId={id} />
-          )}
-          {report && (
-            <Link href={`/dashboard/events/${id}/final-report`}>
-              <Button size="sm" variant="outline">Open Final Report</Button>
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader><CardTitle>EPF Details</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {event.description && (
-                <p className="text-sm text-gray-700 leading-relaxed">{event.description}</p>
+          }
+          eyebrow="Event Workspace"
+          title={`${event.event_code} · ${event.title}`}
+          subtitle={`Created ${formatRelative(event.created_at)}. Use this workspace to review proposal quality, budget scope, linked Drive folders, and reporting readiness.`}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {canApprove && (
+                <Link href={`/dashboard/events/${id}/approve`}>
+                  <Button size="sm">Review And Approve</Button>
+                </Link>
               )}
+              {canSubmit && <SubmitButton eventId={id} />}
+              {canEditProposal && (
+                <Link href={`/dashboard/events/${id}/edit`}>
+                  <Button size="sm" variant="outline">Edit Proposal</Button>
+                </Link>
+              )}
+              {canComplete && <CompleteButton eventId={id} />}
+              {canReport && (
+                <Link href={`/dashboard/events/${id}/report`}>
+                  <Button size="sm" variant="outline">Submit Report</Button>
+                </Link>
+              )}
+              {canEditReport && (
+                <Link href={`/dashboard/events/${id}/report`}>
+                  <Button size="sm" variant="outline">View / Edit Report</Button>
+                </Link>
+              )}
+              {canArchive && <ArchiveButton eventId={id} />}
+              {report && (
+                <Link href={`/dashboard/events/${id}/final-report`}>
+                  <Button size="sm" variant="outline">Open Final Report</Button>
+                </Link>
+              )}
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <StatusBadge status={event.status} flagged={event.is_budget_flagged} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-emerald-100/70">Region</p>
+                <p className="mt-2 text-lg font-semibold">{event.region}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-emerald-100/70">Current reviewer</p>
+                <p className="mt-2 text-lg font-semibold">{event.current_reviewer ? event.current_reviewer.replace('_', ' ') : 'None'}</p>
+              </div>
+            </div>
+          </div>
+        </PageHero>
 
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Target className="w-4 h-4 text-gray-400" />
-                  <span>{event.goal || 'General event'}</span>
+        <StatGrid>
+          <StatCard label="Planned budget" value={formatCurrency(totalEstimated)} helper="Original EPF budget total" />
+          <StatCard label="Actual spend" value={formatCurrency(totalActual)} helper="Updated from ECR actuals" />
+          <StatCard label="Report status" value={report ? 'Available' : 'Pending'} helper={report ? 'Final report can be opened' : 'Submit ECR to unlock'} />
+          <StatCard label="Support files" value={String(files.length)} helper="Legacy uploads still visible below" />
+        </StatGrid>
+
+        <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
+          <div className="space-y-6">
+            <SectionBlock title="EPF Details" subtitle="The original proposal context, venue, coordinator details, and participation expectations.">
+              <div className="grid gap-4">
+                {event.description ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 text-sm leading-7 text-slate-700">
+                    {event.description}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {eventSummary.map((item) => (
+                    <div key={item.label} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_16px_32px_rgba(15,23,42,0.04)]">
+                      <div className="mb-2 flex items-center gap-2 text-slate-500">
+                        {item.icon}
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em]">{item.label}</span>
+                      </div>
+                      <p className="text-sm font-medium text-slate-900">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin className="w-4 h-4 text-gray-400" />
-                  <span>{event.location}</span>
-                </div>
+
                 {event.venue_gmaps_link && (
-                  <a href={event.venue_gmaps_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-green-700 hover:underline">
-                    <ExternalLink className="w-4 h-4 text-green-600" />
-                    <span>Open Google Maps</span>
+                  <a href={event.venue_gmaps_link} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    <ExternalLink className="h-4 w-4" />
+                    Open venue in Google Maps
                   </a>
                 )}
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span>
-                    {formatDate(event.event_date)}
-                    {event.event_end_date && ` → ${formatDate(event.event_end_date)}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  <span>{event.start_time || 'TBD'} - {event.end_time || 'TBD'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Users className="w-4 h-4 text-gray-400" />
-                  <span>{event.expected_attendees} expected attendees</span>
-                </div>
-                <div className="text-gray-600">
-                  <span className="text-gray-400 text-xs mr-2">Region:</span>
-                  <span>{event.region}</span>
-                </div>
-              </div>
 
-              {event.participant_profile && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Participant Profile</p>
-                  <p className="text-sm text-gray-700">{event.participant_profile}</p>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <InfoBlock title="Participant Profile" value={event.participant_profile} fallback="Participant profile not specified." />
+                  <InfoBlock
+                    title="Coordinator"
+                    value={[event.coordinator_name, event.coordinator_email, event.coordinator_phone].filter(Boolean).join('\n')}
+                    fallback="Coordinator details are incomplete."
+                    multiline
+                  />
                 </div>
-              )}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Coordinator</p>
-                  <p className="text-sm font-medium">{event.coordinator_name || 'Not set'}</p>
-                  <p className="text-sm text-gray-600">{event.coordinator_email || 'No email'}</p>
-                  <p className="text-sm text-gray-600">{event.coordinator_phone || 'No phone'}</p>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <InfoBlock title="Budget Justification" value={event.budget_justification} fallback="No budget justification added." />
+                  <InfoBlock
+                    title="Social Media Requirements"
+                    value={
+                      event.social_media_required
+                        ? [event.social_media_channels?.join(', '), event.social_media_requirements, event.social_media_caption].filter(Boolean).join('\n\n')
+                        : 'Social media support not required.'
+                    }
+                  />
                 </div>
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Social Media</p>
-                  <p className="text-sm text-gray-700">
-                    {event.social_media_required ? 'Required' : 'Not required'}
-                  </p>
-                  {event.social_media_required && (
-                    <>
-                      <p className="text-sm text-gray-600 mt-1">{event.social_media_channels?.join(', ') || 'Channels not set'}</p>
-                      {event.social_media_requirements && <p className="text-sm text-gray-600 mt-2">{event.social_media_requirements}</p>}
-                    </>
-                  )}
-                </div>
-              </div>
 
-              {event.is_budget_flagged && event.flag_reason && (
-                <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-700">
-                  Budget alert: {event.flag_reason}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Budget Breakdown</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm text-gray-600">Estimated Budget</p>
-                  <p className="text-xl font-semibold text-green-700">{formatCurrency(totalEstimated)}</p>
-                </div>
-                <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
-                  <p className="text-sm text-gray-600">Actual Budget</p>
-                  <p className="text-xl font-semibold text-cyan-700">{formatCurrency(totalActual)}</p>
-                </div>
-              </div>
-              <BudgetLineItems
-                items={event.budgets as Budget[] ?? []}
-                readOnly
-                showActual
-              />
-              {event.budget_justification && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Budget Justification</p>
-                  <p className="text-sm text-gray-700">{event.budget_justification}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <DriveFoldersPanel
-            eventId={id}
-            title="Drive Workspace"
-            description="This event now uses Google Drive as the source of truth for proposal, media, report, and invoice documents."
-            folders={driveFolders}
-            syncStatus={event.drive_sync_status}
-            syncMessage={event.drive_sync_message}
-            canRefresh={canRefreshDrive}
-          />
-
-          {files.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Legacy Uploaded Files</CardTitle></CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="text-gray-500">These files were uploaded before the Drive-first workflow. New supporting documents should go into the Drive folders above.</p>
-                {files.map((file) => (
-                  <div key={file.id} className="rounded-md border border-gray-200 p-3">
-                    <p className="font-medium text-gray-900">{file.file_name}</p>
-                    <p className="text-xs text-gray-500">{file.file_type}</p>
+                {event.is_budget_flagged && event.flag_reason && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Budget alert: {event.flag_reason}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                )}
+              </div>
+            </SectionBlock>
 
-          {report && (
-            <>
-              <Card>
-                <CardHeader><CardTitle>ECR Summary</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Actual Attendees:</span> <strong>{report.actual_attendees ?? 'N/A'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Donations Received:</span> <strong>{formatCurrency(report.donations_received ?? 0)}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Actual Venue:</span> {report.actual_location || event.location}
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Actual Time:</span> {report.actual_start_time || 'TBD'} - {report.actual_end_time || 'TBD'}
-                    </div>
-                  </div>
-
-                  {report.execution_details && (
-                    <Section label="Execution Details" value={report.execution_details} />
-                  )}
-                  {report.outcome_summary && (
-                    <Section label="Outcome Summary" value={report.outcome_summary} />
-                  )}
-                  {report.challenges && (
-                    <Section label="Issues / Challenges" value={report.challenges} />
-                  )}
-                  {report.social_media_writeup && (
-                    <Section label="Social Media Writeup" value={report.social_media_writeup} />
-                  )}
-                  {report.follow_up_actions && (
-                    <Section label="Follow-Up Actions" value={report.follow_up_actions} />
-                  )}
-                  {report.auto_summary && (
-                    <Section label="Auto Summary" value={report.auto_summary} mono />
-                  )}
-                </CardContent>
-              </Card>
-
-            </>
-          )}
-
-          {!report && ['completed', 'report_submitted', 'archived'].includes(event.status) && (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardHeader><CardTitle>Final Report Not Ready Yet</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm text-amber-900">
-                <p>
-                  This event can have a final report, but no Event Completion Report data is available yet. Submit or update the ECR first, and the final report will become available automatically.
-                </p>
-                <div>
-                  <Link href={`/dashboard/events/${id}/report`}>
-                    <Button size="sm">Open Report Editor</Button>
-                  </Link>
+            <SectionBlock title="Budget Breakdown" subtitle="Review the proposed and actual cost structure line by line.">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Estimated budget</p>
+                  <p className="mt-3 text-3xl font-semibold text-emerald-800">{formatCurrency(totalEstimated)}</p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle>Submitted By</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm">
-                  {(event.profiles as { full_name: string })?.full_name?.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{(event.profiles as { full_name: string })?.full_name}</p>
-                  <p className="text-xs text-gray-500">{(event.profiles as { region?: string })?.region}</p>
+                <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Actual budget</p>
+                  <p className="mt-3 text-3xl font-semibold text-cyan-800">{formatCurrency(totalActual)}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="mt-5">
+                <BudgetLineItems items={(event.budgets as Budget[]) ?? []} readOnly showActual />
+              </div>
+            </SectionBlock>
 
-          <Card>
-            <CardHeader><CardTitle>Approval Progress</CardTitle></CardHeader>
-            <CardContent>
-              <ApprovalTimeline approvals={event.approvals as Approval[] ?? []} />
-            </CardContent>
-          </Card>
+            <DriveFoldersPanel
+              eventId={id}
+              title="Drive Workspace"
+              description="This event now uses Google Drive as the source of truth for proposal, media, report, and invoice documents."
+              folders={driveFolders}
+              syncStatus={event.drive_sync_status}
+              syncMessage={event.drive_sync_message}
+              canRefresh={canRefreshDrive}
+            />
+
+            {files.length > 0 && (
+              <SectionBlock title="Legacy Uploaded Files" subtitle="Older uploads are preserved here, but new supporting documents should use the Drive folders above.">
+                <div className="grid gap-3">
+                  {files.map((file) => (
+                    <div key={file.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="font-semibold text-slate-900">{file.file_name}</p>
+                      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{file.file_type}</p>
+                    </div>
+                  ))}
+                </div>
+              </SectionBlock>
+            )}
+
+            {report ? (
+              <SectionBlock title="ECR Summary" subtitle="Snapshot of the submitted completion report and operational outcome.">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InfoBlock title="Actual attendees" value={String(report.actual_attendees ?? 'N/A')} />
+                  <InfoBlock title="Donations received" value={formatCurrency(report.donations_received ?? 0)} />
+                  <InfoBlock title="Actual venue" value={report.actual_location || event.location} />
+                  <InfoBlock title="Actual time" value={`${report.actual_start_time || 'TBD'} - ${report.actual_end_time || 'TBD'}`} />
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <InfoBlock title="Execution Details" value={report.execution_details} fallback="No execution details recorded." />
+                  <InfoBlock title="Outcome Summary" value={report.outcome_summary} fallback="No outcome summary recorded." />
+                  <InfoBlock title="Challenges" value={report.challenges} fallback="No challenges recorded." />
+                  <InfoBlock title="Follow-Up Actions" value={report.follow_up_actions} fallback="No follow-up actions recorded." />
+                </div>
+              </SectionBlock>
+            ) : (
+              ['completed', 'report_submitted', 'archived'].includes(event.status) && (
+                <EmptyState
+                  title="Final report not ready yet"
+                  message="This event can have a final report, but no Event Completion Report data is available yet. Submit or update the ECR first."
+                  action={
+                    <Link href={`/dashboard/events/${id}/report`}>
+                      <Button>Open Report Editor</Button>
+                    </Link>
+                  }
+                />
+              )
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <SectionBlock title="Ownership" subtitle="Event creator and originating region.">
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-sm font-semibold text-emerald-700">
+                  {(event.profiles as { full_name?: string })?.full_name?.charAt(0) || 'E'}
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900">{(event.profiles as { full_name?: string })?.full_name || 'Unknown user'}</p>
+                  <p className="text-sm text-slate-500">{(event.profiles as { region?: string })?.region || 'No region'}</p>
+                </div>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock title="Approval Progress" subtitle="Every stage decision, including revisions, is preserved in the timeline.">
+              <ApprovalTimeline approvals={(event.approvals as Approval[]) ?? []} />
+            </SectionBlock>
+          </div>
         </div>
-      </div>
+      </PageShell>
     </div>
   )
 }
 
-function Section({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function InfoBlock({
+  title,
+  value,
+  fallback,
+  multiline = true,
+}: {
+  title: string
+  value?: string | null
+  fallback?: string
+  multiline?: boolean
+}) {
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">{label}</p>
-      <p className={`text-sm text-gray-700 whitespace-pre-wrap ${mono ? 'font-mono text-xs bg-gray-50 rounded-md p-3' : ''}`}>
-        {value}
-      </p>
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_16px_32px_rgba(15,23,42,0.04)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</p>
+      <p className={`mt-3 text-sm leading-6 text-slate-700 ${multiline ? 'whitespace-pre-wrap' : ''}`}>{value || fallback || 'Not available.'}</p>
     </div>
   )
 }
 
 function SubmitButton({ eventId }: { eventId: string }) {
   return (
-    <form action={async () => {
-      'use server'
-      const { createClient: createSC } = await import('@/lib/supabase/server')
-      const supabase = await createSC()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      await supabase.from('events').update({
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-        current_reviewer: 'events_team',
-      }).eq('id', eventId).eq('created_by', user.id)
-      const { redirect } = await import('next/navigation')
-      redirect(`/dashboard/events/${eventId}`)
-    }}>
+    <form
+      action={async () => {
+        'use server'
+        const { createClient: createSC } = await import('@/lib/supabase/server')
+        const supabase = await createSC()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
+        await supabase
+          .from('events')
+          .update({
+            status: 'submitted',
+            submitted_at: new Date().toISOString(),
+            current_reviewer: 'events_team',
+          })
+          .eq('id', eventId)
+          .eq('created_by', user.id)
+        const { redirect } = await import('next/navigation')
+        redirect(`/dashboard/events/${eventId}`)
+      }}
+    >
       <Button size="sm" type="submit">Submit for Review</Button>
     </form>
   )
@@ -386,26 +348,33 @@ function SubmitButton({ eventId }: { eventId: string }) {
 
 function CompleteButton({ eventId }: { eventId: string }) {
   return (
-    <form action={async () => {
-      'use server'
-      const { createClient: createSC } = await import('@/lib/supabase/server')
-      const supabase = await createSC()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!profile) return
-      if (profile.role !== 'admin' && profile.role !== 'regional_coordinator') return
-      const query = supabase.from('events').update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      }).eq('id', eventId)
-      if (profile.role !== 'admin') {
-        query.eq('created_by', user.id)
-      }
-      await query
-      const { redirect } = await import('next/navigation')
-      redirect(`/dashboard/events/${eventId}`)
-    }}>
+    <form
+      action={async () => {
+        'use server'
+        const { createClient: createSC } = await import('@/lib/supabase/server')
+        const supabase = await createSC()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (!profile) return
+        if (profile.role !== 'admin' && profile.role !== 'regional_coordinator') return
+        const query = supabase
+          .from('events')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', eventId)
+        if (profile.role !== 'admin') {
+          query.eq('created_by', user.id)
+        }
+        await query
+        const { redirect } = await import('next/navigation')
+        redirect(`/dashboard/events/${eventId}`)
+      }}
+    >
       <Button size="sm" variant="outline" type="submit">Mark as Completed</Button>
     </form>
   )
@@ -413,17 +382,22 @@ function CompleteButton({ eventId }: { eventId: string }) {
 
 function ArchiveButton({ eventId }: { eventId: string }) {
   return (
-    <form action={async () => {
-      'use server'
-      const { createClient: createSC } = await import('@/lib/supabase/server')
-      const supabase = await createSC()
-      await supabase.from('events').update({
-        status: 'archived',
-        current_reviewer: null,
-      }).eq('id', eventId)
-      const { redirect } = await import('next/navigation')
-      redirect(`/dashboard/events/${eventId}`)
-    }}>
+    <form
+      action={async () => {
+        'use server'
+        const { createClient: createSC } = await import('@/lib/supabase/server')
+        const supabase = await createSC()
+        await supabase
+          .from('events')
+          .update({
+            status: 'archived',
+            current_reviewer: null,
+          })
+          .eq('id', eventId)
+        const { redirect } = await import('next/navigation')
+        redirect(`/dashboard/events/${eventId}`)
+      }}
+    >
       <Button size="sm" variant="outline" type="submit">Archive Event</Button>
     </form>
   )

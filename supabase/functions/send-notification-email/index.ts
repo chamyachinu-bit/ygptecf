@@ -44,6 +44,12 @@ type EventRecord = {
 type AppSettingsRecord = {
   media_drive_url: string | null
   notification_test_email: string | null
+  notification_test_mode?: 'off' | 'all_stages' | 'stage_specific' | null
+  regional_coordinator_test_email?: string | null
+  events_team_test_email?: string | null
+  finance_team_test_email?: string | null
+  accounts_team_test_email?: string | null
+  admin_test_email?: string | null
 }
 
 type NotificationTemplateRecord = {
@@ -70,6 +76,23 @@ const ROLE_LABELS: Record<UserRole, string> = {
   finance_team: 'Finance Team',
   accounts_team: 'Accounts Team',
   admin: 'Admin',
+}
+
+function getRoleSpecificTestEmail(role: UserRole, settings?: AppSettingsRecord | null) {
+  if (!settings) return null
+
+  switch (role) {
+    case 'regional_coordinator':
+      return settings.regional_coordinator_test_email?.trim() || null
+    case 'events_team':
+      return settings.events_team_test_email?.trim() || null
+    case 'finance_team':
+      return settings.finance_team_test_email?.trim() || null
+    case 'accounts_team':
+      return settings.accounts_team_test_email?.trim() || null
+    case 'admin':
+      return settings.admin_test_email?.trim() || null
+  }
 }
 
 const DEFAULT_TEMPLATES: Record<
@@ -248,7 +271,7 @@ serve(async (req) => {
         .single<ProfileRecord>(),
       supabase
         .from('app_settings')
-        .select('media_drive_url, notification_test_email')
+        .select('media_drive_url, notification_test_email, notification_test_mode, regional_coordinator_test_email, events_team_test_email, finance_team_test_email, accounts_team_test_email, admin_test_email')
         .eq('id', 'global')
         .maybeSingle<AppSettingsRecord>(),
       notification.event_id
@@ -301,7 +324,14 @@ serve(async (req) => {
 
     const renderedSubject = applyTemplate(templateSubject, variables)
     const renderedBody = applyTemplate(templateBody, variables)
-    const deliveredTo = appSettings?.notification_test_email?.trim() || profile.email
+    const roleSpecificTestEmail = getRoleSpecificTestEmail(profile.role, appSettings)
+    const testMode = appSettings?.notification_test_mode ?? 'all_stages'
+    const deliveredTo =
+      testMode === 'all_stages'
+        ? appSettings?.notification_test_email?.trim() || profile.email
+        : testMode === 'stage_specific'
+          ? roleSpecificTestEmail || profile.email
+          : profile.email
     const theme = getNotificationTheme(eventData?.status, notification.title, notification.message)
 
     const htmlBody = `

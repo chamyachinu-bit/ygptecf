@@ -12,6 +12,7 @@ import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLine
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { can, ROLE_LABELS } from '@/lib/utils/permissions'
+import { PageHero, PageShell, StatCard, StatGrid } from '@/components/ui/page-shell'
 import type { RegionOption, UserRole } from '@/types/database'
 
 const EVENT_CODE_REGEX = /^[A-Z]{3}[A-Z]{3}[0-9]{2}$/
@@ -306,25 +307,39 @@ export default function NewEventPage() {
 
   return (
     <div>
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard/events">
-          <button className="p-1.5 rounded hover:bg-gray-100">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        </Link>
-        <div>
-          <h1 className="text-xl font-semibold">New Event Proposal</h1>
-          <p className="text-sm text-gray-500">Build the full EPF before moving it into review.</p>
-        </div>
-      </div>
-
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-6">
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={handleAutofill}>
-              Autofill Test Data
-            </Button>
+      <PageShell className="max-w-6xl">
+        <PageHero
+          lead={
+            <Link href="/dashboard/events">
+              <Button size="sm" variant="secondary" className="border border-white/80 bg-white text-slate-900 shadow-lg hover:bg-slate-100">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Events
+              </Button>
+            </Link>
+          }
+          eyebrow="Proposal Builder"
+          title="New Event Proposal"
+          subtitle="Build the full EPF with event scope, budget, coordinator details, and social requirements before moving it into review."
+        >
+          <div className="space-y-3 text-sm text-emerald-50/90">
+            <p>This workspace auto-generates the event code from region and month, and it supports one-click test autofill for faster walkthroughs.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleAutofill} className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                Autofill Test Data
+              </Button>
+            </div>
           </div>
+        </PageHero>
+
+        <StatGrid className="xl:grid-cols-4">
+          <StatCard label="Current role" value={profileRole ? ROLE_LABELS[profileRole] : 'Loading'} helper="Controls create privileges and code override" />
+          <StatCard label="Region options" value={String(regions.length)} helper="Active admin-managed regions" />
+          <StatCard label="Budget lines" value={String(budgetLinesValid.length)} helper="Valid estimated categories added" />
+          <StatCard label="Social channels" value={String(form.social_media_channels.length)} helper="Selected only when media is required" />
+        </StatGrid>
+
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Event Details</CardTitle>
@@ -655,6 +670,7 @@ export default function NewEventPage() {
           </div>
         </form>
       </div>
+      </PageShell>
     </div>
   )
 }

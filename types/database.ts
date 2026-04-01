@@ -196,6 +196,12 @@ export interface AppSettings {
   id: string
   media_drive_url: string | null
   notification_test_email: string | null
+  notification_test_mode?: 'off' | 'all_stages' | 'stage_specific'
+  regional_coordinator_test_email?: string | null
+  events_team_test_email?: string | null
+  finance_team_test_email?: string | null
+  accounts_team_test_email?: string | null
+  admin_test_email?: string | null
   regions_note?: string | null
   drive_apps_script_url?: string | null
   drive_apps_script_secret?: string | null

@@ -42,16 +42,16 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  events_approved: 'bg-purple-100 text-purple-700',
-  finance_approved: 'bg-indigo-100 text-indigo-700',
-  funded: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  on_hold: 'bg-yellow-100 text-yellow-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  report_submitted: 'bg-cyan-100 text-cyan-700',
-  archived: 'bg-gray-100 text-gray-500',
+  draft: 'border border-slate-200 bg-slate-100/90 text-slate-700',
+  submitted: 'border border-sky-200 bg-sky-100/90 text-sky-700',
+  events_approved: 'border border-violet-200 bg-violet-100/90 text-violet-700',
+  finance_approved: 'border border-indigo-200 bg-indigo-100/90 text-indigo-700',
+  funded: 'border border-emerald-200 bg-emerald-100/90 text-emerald-700',
+  rejected: 'border border-rose-200 bg-rose-100/90 text-rose-700',
+  on_hold: 'border border-amber-200 bg-amber-100/90 text-amber-700',
+  completed: 'border border-teal-200 bg-teal-100/90 text-teal-700',
+  report_submitted: 'border border-cyan-200 bg-cyan-100/90 text-cyan-700',
+  archived: 'border border-slate-200 bg-slate-100/90 text-slate-500',
 }
 
 export function cn(...classes: (string | undefined | null | false)[]): string {

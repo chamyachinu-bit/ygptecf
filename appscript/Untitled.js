@@ -77,7 +77,12 @@ function setupEventDrive(body) {
     proposal_drive_url: proposalFolder ? proposalFolder.getUrl() : null,
     media_drive_url: mediaFolder ? mediaFolder.getUrl() : null,
     report_drive_url: reportFolder ? reportFolder.getUrl() : null,
-    invoice_drive_url: invoiceFolder ? invoiceFolder.getUrl() : null
+    invoice_drive_url: invoiceFolder ? invoiceFolder.getUrl() : null,
+    eventFolderUrl: eventFolder ? eventFolder.getUrl() : null,
+    proposalFolderUrl: proposalFolder ? proposalFolder.getUrl() : null,
+    mediaFolderUrl: mediaFolder ? mediaFolder.getUrl() : null,
+    reportFolderUrl: reportFolder ? reportFolder.getUrl() : null,
+    invoiceFolderUrl: invoiceFolder ? invoiceFolder.getUrl() : null
   };
 }
 
