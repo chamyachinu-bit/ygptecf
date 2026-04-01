@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { EventCard } from '@/components/events/EventCard'
+import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
 import type { Event } from '@/types/database'
 
 export default async function EventsPage() {
@@ -28,6 +29,10 @@ export default async function EventsPage() {
 
   const { data: eventsData } = await query
   const events = eventsData ?? []
+  const actionableStatuses = profile?.role ? (ROLE_REVIEWABLE_STATUSES[profile.role as keyof typeof ROLE_REVIEWABLE_STATUSES] ?? []) : []
+  const actionableEvents = profile?.role === 'regional_coordinator'
+    ? []
+    : (events as Event[]).filter((event) => actionableStatuses.includes(event.status))
 
   // Group by status
   const grouped = (events as Event[]).reduce<Record<string, Event[]>>((acc, e) => {
@@ -45,29 +50,17 @@ export default async function EventsPage() {
           <div>
             <h2 className="text-base font-semibold text-gray-900 mb-3">
               Action Required
-              {(grouped['submitted']?.length || 0) +
-               (grouped['events_approved']?.length || 0) +
-               (grouped['finance_approved']?.length || 0) > 0 && (
+              {actionableEvents.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-                  {(grouped['submitted']?.length || 0) +
-                   (grouped['events_approved']?.length || 0) +
-                   (grouped['finance_approved']?.length || 0)}
+                  {actionableEvents.length}
                 </span>
               )}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {[
-                ...(grouped['submitted'] || []),
-                ...(grouped['events_approved'] || []),
-                ...(grouped['finance_approved'] || []),
-              ].map((event) => (
+              {actionableEvents.map((event) => (
                 <EventCard key={event.id} event={event} />
               ))}
-              {[
-                ...(grouped['submitted'] || []),
-                ...(grouped['events_approved'] || []),
-                ...(grouped['finance_approved'] || []),
-              ].length === 0 && (
+              {actionableEvents.length === 0 && (
                 <p className="text-sm text-gray-500 col-span-3">No events require action.</p>
               )}
             </div>

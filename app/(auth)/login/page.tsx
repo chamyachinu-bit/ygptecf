@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Leaf } from 'lucide-react'
+import { AppBrand } from '@/components/branding/AppBrand'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -37,14 +37,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="flex items-center justify-center gap-3">
-          <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
-            <Leaf className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">NGO Events</h1>
-            <p className="text-xs text-gray-500">Management System</p>
-          </div>
+        <div className="flex items-center justify-center">
+          <AppBrand />
         </div>
 
         <Card>

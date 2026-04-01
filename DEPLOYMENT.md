@@ -74,7 +74,14 @@ npx supabase functions deploy submit-event
 npx supabase secrets set RESEND_API_KEY=re_YOUR_KEY
 npx supabase secrets set RESEND_FROM_EMAIL="NGO Events <onboarding@resend.dev>"
 npx supabase secrets set APP_URL=https://YOUR_APP.vercel.app
+
+# Optional: use Google Apps Script instead of Resend
+npx supabase secrets set APPS_SCRIPT_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+npx supabase secrets set APPS_SCRIPT_SHARED_SECRET=your_shared_secret
 ```
+
+If `APPS_SCRIPT_WEBHOOK_URL` is set, the function will send mail through Apps Script first.
+If it is not set, the function falls back to Resend.
 
 ---
 

@@ -29,12 +29,18 @@ export default async function EventDetailPage({ params }: PageProps) {
       *,
       profiles:created_by(full_name, email, region, role),
       budgets(*),
-      approvals(*, profiles:reviewer_id(full_name, role)),
+      approvals(*, profiles:reviewer_id(full_name, role), approval_comments(*)),
       files(*),
       event_reports(*)
     `)
     .eq('id', id)
     .single()
+
+  const { data: appSettings } = await supabase
+    .from('app_settings')
+    .select('media_drive_url')
+    .eq('id', 'global')
+    .maybeSingle()
 
   if (!event) notFound()
 
@@ -46,14 +52,15 @@ export default async function EventDetailPage({ params }: PageProps) {
   const totalActual = (event.budgets ?? []).reduce((sum: number, line: Budget) => sum + Number(line.actual_amount || 0), 0)
 
   const reviewableStatuses = profile?.role ? ROLE_REVIEWABLE_STATUSES[profile.role as keyof typeof ROLE_REVIEWABLE_STATUSES] : undefined
-  const canApprove = profile &&
-    reviewableStatuses?.includes(event.status) &&
-    !event.approvals?.some((a: Approval) => a.stage === profile.role)
+  const hasExistingStageApproval = !!event.approvals?.some((a: Approval) => a.stage === profile.role)
+  const canApprove = !!profile && (!!reviewableStatuses?.includes(event.status) || hasExistingStageApproval)
 
   const canSubmit = event.status === 'draft' && event.created_by === user.id
+  const canEditProposal = event.created_by === user.id && ['draft', 'submitted', 'on_hold'].includes(event.status)
   const canComplete = event.status === 'funded' &&
     (event.created_by === user.id || profile?.role === 'admin')
   const canReport = event.status === 'completed' && event.created_by === user.id
+  const canEditReport = !!report && (event.created_by === user.id || profile?.role === 'admin') && ['completed', 'report_submitted', 'archived'].includes(event.status)
   const canArchive = event.status === 'report_submitted' &&
     (event.created_by === user.id || profile?.role === 'admin')
   const canUploadProposalFiles = event.created_by === user.id && event.status === 'draft'
@@ -82,12 +89,22 @@ export default async function EventDetailPage({ params }: PageProps) {
           {canSubmit && (
             <SubmitButton eventId={id} />
           )}
+          {canEditProposal && (
+            <Link href={`/dashboard/events/${id}/edit`}>
+              <Button size="sm" variant="outline">Edit Proposal</Button>
+            </Link>
+          )}
           {canComplete && (
             <CompleteButton eventId={id} />
           )}
           {canReport && (
             <Link href={`/dashboard/events/${id}/report`}>
               <Button size="sm" variant="outline">Submit Report</Button>
+            </Link>
+          )}
+          {canEditReport && (
+            <Link href={`/dashboard/events/${id}/report`}>
+              <Button size="sm" variant="outline">View / Edit Report</Button>
             </Link>
           )}
           {canArchive && (
@@ -186,7 +203,6 @@ export default async function EventDetailPage({ params }: PageProps) {
               </div>
               <BudgetLineItems
                 items={event.budgets as Budget[] ?? []}
-                onChange={() => {}}
                 readOnly
                 showActual
               />
@@ -206,6 +222,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             canUpload={canUploadProposalFiles}
             uploadLabel="Proposal Attachments"
             fileType="proposal_attachment"
+            driveLink={appSettings?.media_drive_url}
           />
 
           {report && (
@@ -255,6 +272,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                 userId={user.id}
                 uploadLabel="Report Images & Attachments"
                 fileType="report_image"
+                driveLink={appSettings?.media_drive_url}
               />
             </>
           )}

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/events/StatusBadge'
 import { BudgetLineItems } from '@/components/events/BudgetLineItems'
 import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
-import type { Event, Profile, Approval } from '@/types/database'
+import type { Event, Profile, Approval, ApprovalComment } from '@/types/database'
 
 export default function ApprovePage() {
   const params = useParams()
@@ -22,6 +22,8 @@ export default function ApprovePage() {
   const [event, setEvent] = useState<Event | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [comments, setComments] = useState('')
+  const [selectedDecision, setSelectedDecision] = useState<'approved' | 'rejected' | 'on_hold' | null>(null)
+  const [existingApproval, setExistingApproval] = useState<Approval | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -32,13 +34,17 @@ export default function ApprovePage() {
 
       const [{ data: profileData }, { data: eventData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('events').select('*, budgets(*), approvals(*)').eq('id', id).single(),
+        supabase.from('events').select('*, budgets(*), approvals(*, approval_comments(*))').eq('id', id).single(),
       ])
       setProfile(profileData)
       setEvent(eventData)
+      const matchedApproval = eventData?.approvals?.find((approval: Approval) => approval.stage === profileData?.role) ?? null
+      setExistingApproval(matchedApproval)
+      setSelectedDecision(matchedApproval?.decision ?? null)
+      setComments('')
     }
     load()
-  }, [id])
+  }, [id, supabase])
 
   const handleDecision = async (decision: 'approved' | 'rejected' | 'on_hold') => {
     if (!profile || !event) return
@@ -48,13 +54,38 @@ export default function ApprovePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { error: approvalError } = await supabase.from('approvals').insert({
+    if (existingApproval && !comments.trim()) {
+      setError('Please add a new reason for changing the saved decision.')
+      setLoading(false)
+      return
+    }
+
+    if (!existingApproval && !comments.trim()) {
+      setError('Please add a reason or note for this decision.')
+      setLoading(false)
+      return
+    }
+
+    const approvalPayload = {
       event_id: id,
       reviewer_id: user.id,
       stage: profile.role,
       decision,
-      comments: comments || null,
-    })
+      comments: comments.trim() || null,
+    }
+
+    const { error: approvalError } = existingApproval
+      ? await supabase
+          .from('approvals')
+          .update({
+            decision,
+            comments: comments.trim() || null,
+            decided_at: new Date().toISOString(),
+          })
+          .eq('id', existingApproval.id)
+      : await supabase
+          .from('approvals')
+          .insert(approvalPayload)
 
     if (approvalError) {
       setError(approvalError.message)
@@ -63,6 +94,7 @@ export default function ApprovePage() {
     }
 
     router.push(`/dashboard/events/${id}`)
+    router.refresh()
   }
 
   if (!event || !profile) {
@@ -74,17 +106,17 @@ export default function ApprovePage() {
   }
 
   const canReview = ROLE_REVIEWABLE_STATUSES[profile.role]?.includes(event.status)
-  const alreadyReviewed = event.approvals?.some((a: Approval) => a.stage === profile.role)
+  const decisionHistory = (existingApproval?.approval_comments ?? [])
+    .slice()
+    .sort((a: ApprovalComment, b: ApprovalComment) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  if (!canReview || alreadyReviewed) {
+  if (!canReview && !existingApproval) {
     return (
       <div className="p-6">
         <Card>
           <CardContent className="pt-6 text-center">
             <p className="text-gray-600">
-              {alreadyReviewed
-                ? 'You have already reviewed this event.'
-                : 'This event is not ready for your review yet.'}
+              This event is not ready for your review yet.
             </p>
             <Link href={`/dashboard/events/${id}`}>
               <Button variant="outline" className="mt-4">Back to Event</Button>
@@ -123,7 +155,7 @@ export default function ApprovePage() {
               <div><span className="text-gray-500">Date:</span> {event.event_date}</div>
               <div><span className="text-gray-500">Location:</span> {event.location}</div>
               <div><span className="text-gray-500">Attendees:</span> {event.expected_attendees}</div>
-              <div><span className="text-gray-500">Total Budget:</span> <strong className={event.is_budget_flagged ? 'text-orange-600' : ''}>${total.toLocaleString()}</strong></div>
+              <div><span className="text-gray-500">Total Budget:</span> <strong className={event.is_budget_flagged ? 'text-orange-600' : ''}>₹{total.toLocaleString('en-IN')}</strong></div>
             </div>
             {event.description && (
               <p className="text-gray-700 border-t pt-3">{event.description}</p>
@@ -146,12 +178,35 @@ export default function ApprovePage() {
 
         {/* Decision */}
         <Card>
-          <CardHeader><CardTitle>Your Decision</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>{existingApproval ? 'Revise Your Decision' : 'Your Decision'}</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
+            {existingApproval && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                Current saved decision: <strong>{existingApproval.decision}</strong>. If you change it, a new reason will be stored as a separate history note.
+              </div>
+            )}
+            {existingApproval && decisionHistory.length > 0 && (
+              <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <p className="text-sm font-medium text-gray-900">Decision History</p>
+                {decisionHistory.map((entry) => (
+                  <div key={entry.id} className="rounded-md border border-gray-200 bg-white p-3 text-sm">
+                    <p className="font-medium text-gray-900">
+                      {entry.is_revision ? 'Revision' : 'Initial decision'}: {entry.decision}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{new Date(entry.created_at).toLocaleString('en-IN')}</p>
+                    <p className="text-gray-700 mt-2 whitespace-pre-wrap">{entry.comment || 'No reason provided.'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-1.5">
-              <Label>Comments (optional)</Label>
+              <Label>{existingApproval ? 'New Reason for Change' : 'Decision Reason'}</Label>
               <Textarea
-                placeholder="Add any comments, conditions, or reasons for your decision..."
+                placeholder={existingApproval
+                  ? 'Explain why you are changing the previous decision...'
+                  : 'Add the reason, conditions, or context for this decision...'}
                 rows={4}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
@@ -164,29 +219,43 @@ export default function ApprovePage() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => handleDecision('approved')}
+                onClick={() => {
+                  setSelectedDecision('approved')
+                  handleDecision('approved')
+                }}
                 loading={loading}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
-                Approve
+                {existingApproval ? 'Update to Approve' : 'Approve'}
               </Button>
               <Button
-                onClick={() => handleDecision('on_hold')}
+                onClick={() => {
+                  setSelectedDecision('on_hold')
+                  handleDecision('on_hold')
+                }}
                 loading={loading}
                 variant="outline"
                 className="text-yellow-600 border-yellow-300 hover:bg-yellow-50"
               >
-                Hold
+                {existingApproval ? 'Update to Hold' : 'Hold'}
               </Button>
               <Button
-                onClick={() => handleDecision('rejected')}
+                onClick={() => {
+                  setSelectedDecision('rejected')
+                  handleDecision('rejected')
+                }}
                 loading={loading}
                 variant="destructive"
                 className="flex-1"
               >
-                Reject
+                {existingApproval ? 'Update to Reject' : 'Reject'}
               </Button>
             </div>
+            {selectedDecision && (
+              <p className="text-xs text-gray-500">
+                Selected action: <strong>{selectedDecision}</strong>
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

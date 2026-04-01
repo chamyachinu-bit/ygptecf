@@ -172,7 +172,7 @@ create or replace function public.flag_abnormal_budget()
 returns trigger language plpgsql security definer as $$
 declare
   v_total    numeric;
-  v_threshold numeric := 5000;
+  v_threshold numeric := 50000;
 begin
   -- Only check when transitioning draft → submitted
   if new.status = 'submitted' and old.status = 'draft' then
@@ -184,8 +184,8 @@ begin
       update public.events
       set
         is_budget_flagged = true,
-        flag_reason = 'Total estimated budget of $' || v_total ||
-                      ' exceeds the standard threshold of $' || v_threshold ||
+        flag_reason = 'Total estimated budget of INR ' || v_total ||
+                      ' exceeds the standard threshold of INR ' || v_threshold ||
                       '. Please review carefully.'
       where id = new.id;
 
@@ -196,8 +196,8 @@ begin
         new.id,
         'budget_flagged',
         '⚠ Budget Alert: ' || new.title,
-        'Event "' || new.title || '" has a total estimated budget of $' || v_total ||
-        ', which exceeds the $' || v_threshold || ' threshold.'
+        'Event "' || new.title || '" has a total estimated budget of INR ' || v_total ||
+        ', which exceeds the INR ' || v_threshold || ' threshold.'
       from public.profiles p
       where p.role = 'admin' and p.is_active = true;
     end if;

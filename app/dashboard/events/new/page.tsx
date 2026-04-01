@@ -86,6 +86,52 @@ export default function NewEventPage() {
     [budgetLines]
   )
 
+  const handleAutofill = () => {
+    const now = new Date()
+    const future = new Date(now)
+    future.setDate(now.getDate() + 7)
+    const eventMonth = future.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    const uniqueSuffix = String((future.getDate() + now.getMinutes()) % 100).padStart(2, '0')
+    const regions = ['Pune', 'Mumbai', 'Nashik', 'Nagpur']
+    const goals = ['Capacity Building', 'Community Outreach', 'Awareness Campaign', 'Volunteer Engagement']
+    const venues = ['Shivajinagar Community Hall', 'Aundh Training Centre', 'Kothrud Workshop Space', 'Pimpri Youth Centre']
+    const pickedRegion = regions[now.getSeconds() % regions.length]
+    const pickedGoal = goals[now.getSeconds() % goals.length]
+    const pickedVenue = venues[now.getSeconds() % venues.length]
+
+    setForm((current) => ({
+      ...current,
+      event_code: `${pickedRegion.slice(0, 3).toUpperCase()}${eventMonth}${uniqueSuffix}`,
+      title: `${pickedGoal} Session ${future.getDate()}`,
+      description: `A focused NGO field event for ${pickedGoal.toLowerCase()} with practical activities, volunteer coordination, and measurable participant outcomes.`,
+      goal: pickedGoal,
+      region: pickedRegion,
+      event_date: future.toISOString().split('T')[0],
+      event_end_date: future.toISOString().split('T')[0],
+      start_time: '10:00',
+      end_time: '16:00',
+      location: pickedVenue,
+      expected_attendees: String(60 + (now.getSeconds() % 50)),
+      participant_profile: 'Community volunteers, youth leaders, local NGO staff, and beneficiary representatives.',
+      coordinator_name: current.coordinator_name || 'Nakul Kokate',
+      coordinator_phone: current.coordinator_phone || '9876543210',
+      coordinator_email: current.coordinator_email || 'kokatenakul11@gmail.com',
+      requires_budget: true,
+      budget_justification: 'Budget needed for venue, refreshments, printed material, and local transport support.',
+      social_media_required: true,
+      social_media_requirements: 'Need 8 to 10 photos, one short reel, and a same-day impact update for NGO channels.',
+      social_media_caption: `Building momentum through ${pickedGoal.toLowerCase()} in ${pickedRegion} with local partners and volunteers.`,
+      social_media_channels: ['Facebook', 'Instagram', 'WhatsApp'],
+    }))
+
+    setBudgetLines([
+      { category: 'Venue', description: 'Hall booking', justification: 'Indoor space for full workshop day', estimated_amount: 12000, actual_amount: null },
+      { category: 'Catering', description: 'Lunch and tea', justification: 'Refreshments for participants and volunteers', estimated_amount: 18000, actual_amount: null },
+      { category: 'Printing', description: 'Worksheets and handouts', justification: 'Participant learning material', estimated_amount: 7000, actual_amount: null },
+      { category: 'Transport', description: 'Volunteer travel support', justification: 'Field team local commute', estimated_amount: 5000, actual_amount: null },
+    ])
+  }
+
   const toggleChannel = (channel: string) => {
     setForm((current) => ({
       ...current,
@@ -207,6 +253,11 @@ export default function NewEventPage() {
 
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-6">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" onClick={handleAutofill}>
+              Autofill Test Data
+            </Button>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>Event Details</CardTitle>

@@ -77,7 +77,7 @@ export function EventsChart({ events }: EventsChartProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Budget by Region (USD)</CardTitle>
+          <CardTitle className="text-base">Budget by Region (INR)</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -85,7 +85,7 @@ export function EventsChart({ events }: EventsChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="region" tick={{ fontSize: 11 }} width={80} />
-              <Tooltip formatter={(v) => [`$${Number(v).toLocaleString()}`, 'Budget']} />
+              <Tooltip formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Budget']} />
               <Bar dataKey="budget" fill="#22c55e" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>

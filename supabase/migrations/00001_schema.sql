@@ -87,7 +87,7 @@ create table public.budgets (
   description     text,
   estimated_amount numeric(12,2) not null check (estimated_amount >= 0),
   actual_amount   numeric(12,2) check (actual_amount >= 0),
-  currency        char(3) not null default 'USD',
+  currency        char(3) not null default 'INR',
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );

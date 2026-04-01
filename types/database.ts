@@ -110,6 +110,19 @@ export interface Approval {
   created_at: string
   // Joined
   profiles?: Profile
+  approval_comments?: ApprovalComment[]
+}
+
+export interface ApprovalComment {
+  id: string
+  approval_id: string
+  event_id: string
+  reviewer_id: string
+  stage: UserRole
+  decision: ApprovalDecision
+  comment: string | null
+  is_revision: boolean
+  created_at: string
 }
 
 export interface EventFile {
@@ -136,6 +149,25 @@ export interface Notification {
   is_read: boolean
   email_sent: boolean
   created_at: string
+}
+
+export interface NotificationTemplate {
+  id: string
+  recipient_role: UserRole
+  notification_type: NotificationType
+  subject_template: string
+  body_template: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AppSettings {
+  id: string
+  media_drive_url: string | null
+  notification_test_email: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface EventReport {

@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileUpload } from '@/components/events/FileUpload'
 import { BudgetLineItems, type BudgetLine } from '@/components/events/BudgetLineItems'
-import type { Event } from '@/types/database'
+import type { Event, EventReport } from '@/types/database'
 
 export default function ReportPage() {
   const params = useParams()
@@ -20,6 +20,7 @@ export default function ReportPage() {
   const router = useRouter()
   const supabase = createClient()
   const [event, setEvent] = useState<Event | null>(null)
+  const [existingReport, setExistingReport] = useState<EventReport | null>(null)
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([])
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -47,12 +48,14 @@ export default function ReportPage() {
 
       const { data } = await supabase
         .from('events')
-        .select('*, budgets(*)')
+        .select('*, budgets(*), event_reports(*)')
         .eq('id', id)
         .single()
 
       if (data) {
         setEvent(data)
+        const savedReport = data.event_reports?.[0] ?? null
+        setExistingReport(savedReport)
         setBudgetLines(
           (data.budgets ?? []).map((line: BudgetLine) => ({
             id: line.id,
@@ -65,7 +68,19 @@ export default function ReportPage() {
         )
         setForm((current) => ({
           ...current,
-          actual_location: data.location || '',
+          actual_attendees: savedReport?.actual_attendees?.toString() || current.actual_attendees,
+          execution_details: savedReport?.execution_details || current.execution_details,
+          outcome_summary: savedReport?.outcome_summary || current.outcome_summary,
+          challenges: savedReport?.challenges || current.challenges,
+          lessons_learned: savedReport?.lessons_learned || current.lessons_learned,
+          budget_notes: savedReport?.budget_notes || current.budget_notes,
+          donations_received: savedReport?.donations_received?.toString() || current.donations_received,
+          donation_notes: savedReport?.donation_notes || current.donation_notes,
+          actual_start_time: savedReport?.actual_start_time || current.actual_start_time,
+          actual_end_time: savedReport?.actual_end_time || current.actual_end_time,
+          actual_location: savedReport?.actual_location || data.location || '',
+          social_media_writeup: savedReport?.social_media_writeup || current.social_media_writeup,
+          follow_up_actions: savedReport?.follow_up_actions || current.follow_up_actions,
         }))
       }
     }
@@ -83,6 +98,35 @@ export default function ReportPage() {
     [budgetLines]
   )
 
+  const handleAutofill = () => {
+    if (!event) return
+    const now = new Date()
+    const actualAttendees = Math.max(25, event.expected_attendees - ((now.getMinutes() % 12) + 3))
+
+    setForm({
+      actual_attendees: String(actualAttendees),
+      execution_details: `The event started with welcome remarks, followed by structured training sessions, group activities, and a closing reflection. Attendance remained steady and participant engagement was strong throughout the day.`,
+      outcome_summary: `Participants completed the planned activities and produced practical action points for follow-up. The session delivered visible engagement and strong local coordination.`,
+      challenges: `Registration and AV setup caused a short delay at the start, but the team recovered the schedule quickly.`,
+      lessons_learned: `Set up registration and technical equipment earlier, and assign one volunteer solely for participant flow management.`,
+      budget_notes: `Refreshments came in slightly below estimate while printed material required a few extra copies.`,
+      donations_received: String(1000 + (now.getSeconds() % 5) * 250),
+      donation_notes: 'Local partner contributed a mix of cash support and in-kind refreshments.',
+      actual_start_time: '10:15',
+      actual_end_time: '15:45',
+      actual_location: event.location,
+      social_media_writeup: `Published a same-day update with event highlights, participant photos, and key learning points for community outreach.`,
+      follow_up_actions: `Share summary notes with stakeholders, schedule a follow-up call, and track participant action commitments.`,
+    })
+
+    setBudgetLines((current) =>
+      current.map((line, index) => ({
+        ...line,
+        actual_amount: Math.max(0, Number(line.estimated_amount) - (index % 2 === 0 ? 0 : 100) + (index === 2 ? 150 : 0)),
+      }))
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -94,7 +138,7 @@ export default function ReportPage() {
       return
     }
 
-    const { error: reportError } = await supabase.from('event_reports').insert({
+    const reportPayload = {
       event_id: id,
       submitted_by: userId,
       actual_attendees: parseInt(form.actual_attendees, 10) || null,
@@ -110,7 +154,16 @@ export default function ReportPage() {
       actual_location: form.actual_location || null,
       social_media_writeup: form.social_media_writeup || null,
       follow_up_actions: form.follow_up_actions || null,
-    })
+    }
+
+    const { error: reportError } = existingReport
+      ? await supabase
+          .from('event_reports')
+          .update(reportPayload)
+          .eq('id', existingReport.id)
+      : await supabase
+          .from('event_reports')
+          .insert(reportPayload)
 
     if (reportError) {
       setError(reportError.message)
@@ -168,6 +221,11 @@ export default function ReportPage() {
 
       <div className="p-6 max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" onClick={handleAutofill}>
+              Autofill Test Data
+            </Button>
+          </div>
           <Card>
             <CardHeader><CardTitle>Event Execution Details</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -270,11 +328,11 @@ export default function ReportPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4">
                   <p className="text-sm text-gray-600">Estimated Budget</p>
-                  <p className="text-xl font-semibold text-green-700">${estimatedTotal.toLocaleString()}</p>
+                  <p className="text-xl font-semibold text-green-700">₹{estimatedTotal.toLocaleString('en-IN')}</p>
                 </div>
                 <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
                   <p className="text-sm text-gray-600">Actual Spend</p>
-                  <p className="text-xl font-semibold text-cyan-700">${actualTotal.toLocaleString()}</p>
+                  <p className="text-xl font-semibold text-cyan-700">₹{actualTotal.toLocaleString('en-IN')}</p>
                 </div>
               </div>
 
@@ -354,7 +412,7 @@ export default function ReportPage() {
           )}
 
           <Button type="submit" className="w-full" loading={loading}>
-            Submit Event Completion Report
+            {existingReport ? 'Update Event Completion Report' : 'Submit Event Completion Report'}
           </Button>
         </form>
       </div>

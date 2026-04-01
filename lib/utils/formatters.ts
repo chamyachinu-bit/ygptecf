@@ -1,8 +1,8 @@
 import { format, formatDistanceToNow } from 'date-fns'
 import type { EventStatus } from '@/types/database'
 
-export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(amount: number, currency = 'INR'): string {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,

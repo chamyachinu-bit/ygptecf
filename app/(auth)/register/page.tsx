@@ -9,9 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Leaf } from 'lucide-react'
+import { AppBrand } from '@/components/branding/AppBrand'
 import type { UserRole } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils/permissions'
+import { APP_LOGO_URL, APP_NAME } from '@/lib/branding'
+
+const SELF_REGISTERABLE_ROLES: UserRole[] = ['regional_coordinator']
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -57,9 +60,7 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <Leaf className="w-6 h-6 text-green-600" />
-            </div>
+            <img src={APP_LOGO_URL} alt={APP_NAME} className="h-12 w-12 rounded-full object-cover mx-auto" />
             <h2 className="text-lg font-semibold">Check your email</h2>
             <p className="text-sm text-gray-600">
               We sent a confirmation link to <strong>{form.email}</strong>. Click it to activate your account.
@@ -76,14 +77,8 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="flex items-center justify-center gap-3">
-          <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
-            <Leaf className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">NGO Events</h1>
-            <p className="text-xs text-gray-500">Management System</p>
-          </div>
+        <div className="flex items-center justify-center">
+          <AppBrand />
         </div>
 
         <Card>
@@ -133,11 +128,14 @@ export default function RegisterPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
+                    {SELF_REGISTERABLE_ROLES.map((role) => (
                       <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500">
+                  New accounts are created as Regional Coordinator. Admin and review roles should be assigned from Supabase after registration.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Region</Label>

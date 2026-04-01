@@ -12,6 +12,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   regional_coordinator: [
     'events:create',
     'events:read:own',
+    'history:read:own',
     'events:edit:draft',
     'files:upload',
     'reports:submit',
@@ -20,6 +21,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   events_team: [
     'events:read:submitted',
     'events:read:any',
+    'history:read:any',
     'approvals:create:events_team',
     'files:read',
     'notifications:read:own',
@@ -27,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   finance_team: [
     'events:read:events_approved',
     'events:read:any',
+    'history:read:any',
     'approvals:create:finance_team',
     'budgets:read',
     'files:read',
@@ -35,6 +38,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   accounts_team: [
     'events:read:finance_approved',
     'events:read:any',
+    'history:read:any',
     'approvals:create:accounts_team',
     'budgets:read',
     'files:read',

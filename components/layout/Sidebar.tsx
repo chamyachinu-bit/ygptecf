@@ -6,16 +6,17 @@ import {
   LayoutDashboard,
   Calendar,
   Bell,
+  History,
   Users,
   BarChart3,
   LogOut,
-  Leaf,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/formatters'
 import { ROLE_LABELS } from '@/lib/utils/permissions'
 import type { Profile } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { AppBrand } from '@/components/branding/AppBrand'
 
 interface SidebarProps {
   profile: Profile
@@ -64,6 +65,7 @@ export function Sidebar({ profile, unreadCount = 0 }: SidebarProps) {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/events', label: 'Events', icon: Calendar },
+    { href: '/dashboard/history', label: 'History', icon: History },
     { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, badge: liveUnreadCount },
     ...(profile.role === 'admin' ? [
       { href: '/dashboard/admin/users', label: 'Users', icon: Users },
@@ -79,14 +81,8 @@ export function Sidebar({ profile, unreadCount = 0 }: SidebarProps) {
   return (
     <aside className="flex flex-col w-64 bg-gray-900 text-white min-h-screen">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
-        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-          <Leaf className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <p className="font-bold text-sm">NGO Events</p>
-          <p className="text-xs text-gray-400">Management System</p>
-        </div>
+      <div className="px-6 py-5 border-b border-gray-700">
+        <AppBrand compact dark />
       </div>
 
       {/* Profile */}

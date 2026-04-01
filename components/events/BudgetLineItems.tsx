@@ -17,7 +17,7 @@ export interface BudgetLine {
 
 interface BudgetLineItemsProps {
   items: BudgetLine[]
-  onChange: (items: BudgetLine[]) => void
+  onChange?: (items: BudgetLine[]) => void
   readOnly?: boolean
   showActual?: boolean
 }
@@ -30,14 +30,17 @@ const CATEGORIES = [
 
 export function BudgetLineItems({ items, onChange, readOnly, showActual }: BudgetLineItemsProps) {
   const addLine = () => {
+    if (!onChange) return
     onChange([...items, { category: '', description: '', justification: '', estimated_amount: 0, actual_amount: null }])
   }
 
   const removeLine = (index: number) => {
+    if (!onChange) return
     onChange(items.filter((_, i) => i !== index))
   }
 
   const updateLine = (index: number, field: keyof BudgetLine, value: string | number) => {
+    if (!onChange) return
     const updated = items.map((item, i) =>
       i === index ? { ...item, [field]: value } : item
     )
@@ -111,7 +114,7 @@ export function BudgetLineItems({ items, onChange, readOnly, showActual }: Budge
             />
           </div>
           <div className="w-32">
-            <Label className="text-xs mb-1 block">Amount (USD)</Label>
+            <Label className="text-xs mb-1 block">Amount (INR)</Label>
             <Input
               type="number"
               min="0"
@@ -123,7 +126,7 @@ export function BudgetLineItems({ items, onChange, readOnly, showActual }: Budge
           </div>
           {showActual && (
             <div className="w-32">
-              <Label className="text-xs mb-1 block">Actual (USD)</Label>
+              <Label className="text-xs mb-1 block">Actual (INR)</Label>
               <Input
                 type="number"
                 min="0"
