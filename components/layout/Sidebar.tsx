@@ -65,11 +65,11 @@ export function Sidebar({ profile, unreadCount = 0 }: SidebarProps) {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/events', label: 'Events', icon: Calendar },
+    { href: '/dashboard/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/dashboard/history', label: 'History', icon: History },
     { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, badge: liveUnreadCount },
     ...(profile.role === 'admin' ? [
       { href: '/dashboard/admin/users', label: 'Users', icon: Users },
-      { href: '/dashboard/admin/analytics', label: 'Analytics', icon: BarChart3 },
     ] : []),
   ]
 
