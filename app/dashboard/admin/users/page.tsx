@@ -38,6 +38,7 @@ const SAVED_MESSAGES: Record<string, string> = {
   access: 'Access updated',
   password: 'New password saved',
   template: 'Template saved',
+  user: 'User deleted',
 }
 
 const SETTINGS_VIEWS: Array<{ view: AdminSettingsView; label: string }> = [
@@ -128,16 +129,18 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     'use server'
     const supabase = await createClient()
     const userId = String(formData.get('user_id') || '')
+    const fullName = String(formData.get('full_name') || '').trim()
     const role = String(formData.get('role') || '') as UserRole
     const isActive = formData.get('is_active') === 'true'
     const approvalStatus = String(formData.get('approval_status') || '') as ProfileApprovalStatus
     const region = String(formData.get('region') || '').trim()
 
-    if (!userId || !ROLES.includes(role) || !APPROVAL_STATUSES.includes(approvalStatus)) return
+    if (!userId || !fullName || !ROLES.includes(role) || !APPROVAL_STATUSES.includes(approvalStatus)) return
 
     await supabase
       .from('profiles')
       .update({
+        full_name: fullName,
         role,
         region: region || null,
         is_active: isActive,
@@ -296,6 +299,19 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
     revalidatePath('/dashboard/admin/users')
     redirect(savedRedirect('password', 'users'))
+  }
+
+  async function deleteUser(formData: FormData) {
+    'use server'
+    const serviceSupabase = await createServiceClient()
+    const userId = String(formData.get('user_id') || '')
+
+    if (!userId || userId === adminUserId) return
+
+    await serviceSupabase.auth.admin.deleteUser(userId)
+
+    revalidatePath('/dashboard/admin/users')
+    redirect(savedRedirect('user', 'users'))
   }
 
   const findTemplate = (recipientRole: UserRole, notificationType: NotificationType) =>
@@ -536,7 +552,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         {currentView === 'users' && (
         <SectionBlock
           title="User Access And Approval"
-          subtitle="Approve new registrations, assign workflow roles, and manage account availability."
+          subtitle="Approve new registrations, update names and workflow roles, and manage account availability."
         >
             <Card className="rounded-[1.5rem]">
             <CardContent className="p-0">
@@ -571,6 +587,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                         <td className="px-6 py-5">
                           <form action={updateUserAccess} className="space-y-3">
                             <input type="hidden" name="user_id" value={entry.id} />
+                            <input
+                              type="text"
+                              name="full_name"
+                              defaultValue={entry.full_name}
+                              className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
+                              placeholder="Full name"
+                            />
                             <select
                               name="role"
                               defaultValue={entry.role}
@@ -659,6 +682,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                             <p className="app-text-subtle text-xs leading-5">
                               Access changes apply on the user&apos;s next refresh or login.
                             </p>
+                            <form action={deleteUser}>
+                              <input type="hidden" name="user_id" value={entry.id} />
+                              <button
+                                className="app-danger-soft w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={entry.id === adminUserId}
+                              >
+                                {entry.id === adminUserId ? 'Current admin cannot be deleted here' : 'Delete User'}
+                              </button>
+                            </form>
                           </div>
                         </td>
                       </tr>
