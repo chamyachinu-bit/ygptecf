@@ -244,6 +244,15 @@ export interface AppSettings {
   updated_at: string
 }
 
+export interface AppQuote {
+  id: string
+  text: string
+  author: string
+  active: boolean
+  sort_order: number
+  created_at: string
+}
+
 export interface EventReport {
   id: string
   event_id: string

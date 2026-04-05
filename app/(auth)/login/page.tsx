@@ -11,6 +11,8 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { AppBrand } from '@/components/branding/AppBrand'
+import { QuoteDisplay } from '@/components/ui/quote-display'
+import { Mascot } from '@/components/branding/Mascot'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -41,7 +43,10 @@ export default function LoginPage() {
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-8 lg:grid-cols-[1.08fr_0.92fr]">
         <section className="hidden overflow-hidden rounded-[2rem] border border-white/8 bg-[linear-gradient(140deg,#071321_0%,#0d2a3c_32%,#0e6a4b_100%)] p-10 text-white shadow-[0_36px_80px_rgba(2,6,23,0.34)] lg:flex lg:flex-col lg:justify-between">
           <div className="space-y-8">
-            <AppBrand dark />
+            <div className="flex items-center gap-4">
+              <AppBrand dark />
+              <Mascot size={52} className="opacity-90" />
+            </div>
             <div className="space-y-5">
               <div className="inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-100/90">
                 Secure Sign In
@@ -56,10 +61,13 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <LoginFeature title="Trusted access" body="Each sign-in starts from a secure, controlled account experience." />
-            <LoginFeature title="Calm workflow" body="A focused workspace helps teams move faster with less confusion." />
-            <LoginFeature title="Professional view" body="Built for internal teams who need clarity, consistency, and speed." />
+          <div className="space-y-6">
+            <QuoteDisplay variant="dark" intervalMs={7000} />
+            <div className="grid gap-4 md:grid-cols-3">
+              <LoginFeature title="Trusted access" body="Each sign-in starts from a secure, controlled account experience." />
+              <LoginFeature title="Calm workflow" body="A focused workspace helps teams move faster with less confusion." />
+              <LoginFeature title="Professional view" body="Built for internal teams who need clarity, consistency, and speed." />
+            </div>
           </div>
         </section>
 

@@ -15,14 +15,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'app-field flex h-9 w-full items-center justify-between rounded-md px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50',
+      'group app-field flex h-9 w-full items-center justify-between rounded-md px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ))
@@ -37,6 +37,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         'app-menu relative z-50 min-w-[8rem] overflow-hidden rounded-md shadow-md',
+        'data-[state=open]:animate-dropdown-in data-[state=closed]:animate-dropdown-out',
         className
       )}
       position={position}

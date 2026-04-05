@@ -14,6 +14,7 @@ import {
   FileText,
   Palette,
   Megaphone,
+  Quote,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/formatters'
 import { ROLE_LABELS, can } from '@/lib/utils/permissions'
@@ -56,6 +57,7 @@ function getNavItems(profile: Profile, liveUnreadCount: number) {
     ...(profile.role === 'admin'
       ? [
           { href: '/dashboard/admin/users', label: 'Settings', icon: Users },
+          { href: '/dashboard/admin/quotes', label: 'Quotes', icon: Quote },
           { href: '/dashboard/admin/archived', label: 'Archived', icon: Archive },
         ]
       : []),

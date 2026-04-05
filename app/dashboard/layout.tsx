@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { MobileNavigation, Sidebar } from '@/components/layout/Sidebar'
+import { NavigationLoadingBar } from '@/components/ui/nav-loading'
 import type { Profile } from '@/types/database'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +28,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen bg-transparent">
+      <Suspense fallback={null}>
+        <NavigationLoadingBar />
+      </Suspense>
       <Sidebar profile={profile as Profile} unreadCount={count ?? 0} />
       <main className="flex-1 overflow-auto pb-24 lg:pb-0">
         <MobileNavigation profile={profile as Profile} unreadCount={count ?? 0} />
