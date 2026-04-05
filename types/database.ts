@@ -3,6 +3,9 @@ export type UserRole =
   | 'events_team'
   | 'finance_team'
   | 'accounts_team'
+  | 'bot'
+  | 'designer'
+  | 'social_media_team'
   | 'admin'
 
 export type ProfileApprovalStatus =
@@ -30,6 +33,22 @@ export type NotificationType =
   | 'budget_flagged'
   | 'event_reminder'
   | 'report_due'
+
+export type FlyerRequestStatus =
+  | 'requested'
+  | 'in_progress'
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'released'
+
+export type SocialWorkflowStatus =
+  | 'requested'
+  | 'in_progress'
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'completed'
 
 export interface Profile {
   id: string
@@ -173,6 +192,7 @@ export interface Notification {
   id: string
   user_id: string
   event_id: string | null
+  link_path?: string | null
   type: NotificationType
   title: string
   message: string
@@ -201,12 +221,16 @@ export interface NotificationTemplate {
 export interface AppSettings {
   id: string
   media_drive_url: string | null
+  demo_autofill_enabled?: boolean
   notification_test_email: string | null
   notification_test_mode?: 'off' | 'all_stages' | 'stage_specific'
   regional_coordinator_test_email?: string | null
   events_team_test_email?: string | null
   finance_team_test_email?: string | null
   accounts_team_test_email?: string | null
+  bot_test_email?: string | null
+  designer_test_email?: string | null
+  social_media_team_test_email?: string | null
   admin_test_email?: string | null
   regions_note?: string | null
   drive_apps_script_url?: string | null
@@ -240,6 +264,37 @@ export interface EventReport {
   auto_summary: string | null
   submitted_at: string
   created_at: string
+}
+
+export interface FlyerRequest {
+  id: string
+  event_id: string
+  requested_by: string | null
+  assigned_designer: string | null
+  approver_id: string | null
+  status: FlyerRequestStatus
+  drive_link: string | null
+  notes: string | null
+  approval_notes: string | null
+  approved_at: string | null
+  released_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SocialWorkflowItem {
+  id: string
+  event_id: string
+  requested_by: string | null
+  assigned_social_owner: string | null
+  status: SocialWorkflowStatus
+  drive_link: string | null
+  content_notes: string | null
+  caption_text: string | null
+  completion_notes: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface AuditLog {

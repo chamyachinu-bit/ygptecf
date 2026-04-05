@@ -58,6 +58,8 @@ export default async function FinalReportPage({ params, searchParams }: PageProp
   const event = eventData
 
   if (!event || !profile) notFound()
+  if (profile.role === 'designer') redirect('/dashboard/flyer-requests')
+  if (profile.role === 'social_media_team') redirect('/dashboard/social-workflow')
 
   const report = (reportData ?? null) as EventReport | null
   const reportModel = report

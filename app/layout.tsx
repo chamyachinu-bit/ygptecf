@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { APP_DESCRIPTION, APP_NAME, APP_LOGO_URL } from '@/lib/branding'
+import { ThemeProvider } from '@/components/theme/theme-provider'
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -15,8 +16,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        {children}
+      <body className="min-h-screen antialiased">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   )

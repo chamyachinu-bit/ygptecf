@@ -62,7 +62,7 @@ export function DriveFoldersPanel({
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle>{title}</CardTitle>
-          {description && <p className="mt-2 text-sm text-gray-500">{description}</p>}
+          {description && <p className="app-text-muted mt-2 text-sm">{description}</p>}
         </div>
         {canRefresh && (
           <Button type="button" variant="outline" size="sm" onClick={handleRefresh} loading={refreshing}>
@@ -75,10 +75,10 @@ export function DriveFoldersPanel({
         {(syncStatus || syncMessage) && (
           <div className={`rounded-md border p-3 text-sm ${
             syncStatus === 'ready'
-              ? 'border-green-200 bg-green-50 text-green-700'
+              ? 'app-success-soft'
               : syncStatus === 'error'
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                ? 'app-danger-soft'
+                : 'app-warning-soft'
           }`}>
             <p className="font-medium capitalize">{syncStatus ?? 'Drive status'}</p>
             {syncMessage && <p className="mt-1">{syncMessage}</p>}
@@ -87,14 +87,14 @@ export function DriveFoldersPanel({
 
         <div className="grid gap-3 md:grid-cols-2">
           {folders.map((folder) => (
-            <div key={folder.key} className="rounded-xl border border-gray-200 p-4">
+            <div key={folder.key} className="app-panel-soft rounded-xl p-4">
               <div className="mb-3 flex items-start gap-3">
-                <div className="rounded-lg bg-green-100 p-2 text-green-700">
+                <div className="app-success-soft rounded-lg p-2">
                   <FolderOpen className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{folder.label}</p>
-                  <p className="text-sm text-gray-500">{folder.description}</p>
+                  <p className="app-text-strong font-medium">{folder.label}</p>
+                  <p className="app-text-muted text-sm">{folder.description}</p>
                 </div>
               </div>
               {folder.url ? (
@@ -102,20 +102,20 @@ export function DriveFoldersPanel({
                   href={folder.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:underline"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:underline dark:text-emerald-300"
                 >
                   <ExternalLink className="h-4 w-4" />
                   Open Folder
                 </a>
               ) : (
-                <p className="text-sm text-gray-500">Drive routing not configured yet.</p>
+                <p className="app-text-muted text-sm">Drive routing not configured yet.</p>
               )}
             </div>
           ))}
         </div>
 
         {error && (
-          <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>
+          <p className="app-danger-soft rounded-md p-3 text-sm">{error}</p>
         )}
       </CardContent>
     </Card>

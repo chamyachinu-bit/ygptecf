@@ -17,6 +17,35 @@ import { APP_LOGO_URL, APP_NAME } from '@/lib/branding'
 
 const SELF_REGISTERABLE_ROLES: UserRole[] = ['regional_coordinator']
 
+function evaluatePassword(password: string) {
+  const checks = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    symbol: /[^A-Za-z0-9]/.test(password),
+  }
+
+  const score = Object.values(checks).filter(Boolean).length
+  const meetsMinimum = checks.length && score >= 4
+
+  let label = 'Weak'
+  let tone = 'bg-red-500'
+
+  if (score >= 5) {
+    label = 'Strong'
+    tone = 'bg-emerald-500'
+  } else if (score === 4) {
+    label = 'Good'
+    tone = 'bg-green-500'
+  } else if (score === 3) {
+    label = 'Fair'
+    tone = 'bg-amber-500'
+  }
+
+  return { checks, score, label, tone, meetsMinimum }
+}
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     full_name: '',
@@ -31,6 +60,7 @@ export default function RegisterPage() {
   const [regions, setRegions] = useState<RegionOption[]>([])
   const router = useRouter()
   const supabase = createClient()
+  const passwordState = evaluatePassword(form.password)
 
   useEffect(() => {
     supabase
@@ -45,6 +75,12 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+
+    if (!passwordState.meetsMinimum) {
+      setError('Use a stronger password: at least 8 characters with uppercase, lowercase, number, and special character support.')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signUp({
       email: form.email,
@@ -153,12 +189,33 @@ export default function RegisterPage() {
                     <Label>Password</Label>
                     <Input
                       type="password"
-                      placeholder="Minimum 6 characters"
+                      placeholder="Minimum 8 characters"
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                       required
-                      minLength={6}
+                      minLength={8}
                     />
+                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Password strength</p>
+                        <p className={`text-xs font-semibold ${passwordState.label === 'Strong' ? 'text-emerald-600' : passwordState.label === 'Good' ? 'text-green-600' : passwordState.label === 'Fair' ? 'text-amber-600' : 'text-red-600'}`}>
+                          {passwordState.label}
+                        </p>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className={`h-full rounded-full transition-all ${passwordState.tone}`}
+                          style={{ width: `${Math.max(form.password ? 16 : 0, passwordState.score * 20)}%` }}
+                        />
+                      </div>
+                      <div className="grid gap-1 text-xs text-slate-600">
+                        <PasswordCheck ok={passwordState.checks.length}>At least 8 characters</PasswordCheck>
+                        <PasswordCheck ok={passwordState.checks.upper}>Uppercase letter</PasswordCheck>
+                        <PasswordCheck ok={passwordState.checks.lower}>Lowercase letter</PasswordCheck>
+                        <PasswordCheck ok={passwordState.checks.number}>Number</PasswordCheck>
+                        <PasswordCheck ok={passwordState.checks.symbol}>Special character</PasswordCheck>
+                      </div>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Role</Label>
@@ -227,6 +284,21 @@ function AuthFeature({ title, body }: { title: string; body: string }) {
     <div className="rounded-[1.4rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
       <p className="text-sm font-semibold text-white">{title}</p>
       <p className="mt-2 text-sm leading-6 text-emerald-50/85">{body}</p>
+    </div>
+  )
+}
+
+function PasswordCheck({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`flex items-center gap-2 ${ok ? 'text-emerald-700' : 'text-slate-500'}`}>
+      <span
+        className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+          ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+        }`}
+      >
+        {ok ? '✓' : '•'}
+      </span>
+      <span>{children}</span>
     </div>
   )
 }

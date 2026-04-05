@@ -31,7 +31,7 @@ export function Header({ title, subtitle, eyebrow, notifications = [], onMarkRea
             </Link>
           )}
           <Link href="/dashboard/notifications">
-            <button className="relative rounded-xl border border-white/15 bg-white/10 p-2.5 text-white/90 transition-colors hover:bg-white/20">
+            <button className="relative rounded-xl border border-white/15 bg-white/10 p-2.5 app-text-inverse-muted transition-colors hover:bg-white/20">
               <Bell className="h-5 w-5" />
               {notifications.length > 0 && (
                 <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-red-400" />
@@ -41,7 +41,7 @@ export function Header({ title, subtitle, eyebrow, notifications = [], onMarkRea
         </>
       }
     >
-      <div className="grid gap-3 text-sm text-emerald-50/90">
+      <div className="grid gap-3 text-sm app-text-inverse-muted">
         <p>
           Use this workspace to stay on top of approvals, reporting, budgeting, and operational follow-up.
         </p>

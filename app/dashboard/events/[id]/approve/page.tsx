@@ -40,6 +40,21 @@ const REVIEWER_CONFIG: Record<UserRole, { title: string; summary: string; prompt
     summary: 'Focus on finance evidence readiness, invoice routing, and release confidence before post-event closure.',
     prompts: ['Will Accounts receive enough support documentation later?', 'Do budget lines feel reconcilable after execution?', 'Are report and invoice folders ready for audit follow-through?'],
   },
+  bot: {
+    title: 'BOT Oversight Workspace',
+    summary: 'Board of Trustees users can inspect the event context, history, and support materials, but they do not act as a standard approval stage.',
+    prompts: ['Use this space for leadership review and oversight.', 'Check final reports, history, and support evidence before escalating concerns.', 'Operational approval decisions remain with the workflow reviewers or admin.'],
+  },
+  designer: {
+    title: 'Designer Workspace',
+    summary: 'Design users can inspect event context and support materials, but they are not part of the approval chain.',
+    prompts: ['Use the event context to understand title, region, and timing.', 'Review linked support folders before preparing flyer or support creative.', 'Approval decisions remain with workflow reviewers or admin.'],
+  },
+  social_media_team: {
+    title: 'Social Media Workspace',
+    summary: 'Social Media Team users can inspect event context and documentation readiness, but they do not act as a standard approval stage.',
+    prompts: ['Use the event and report context to prepare post-event communication.', 'Check support folders before packaging media or documentation.', 'Approval decisions remain with workflow reviewers or admin.'],
+  },
   admin: {
     title: 'Admin Override Workspace',
     summary: 'Admins can review any stage, revise prior decisions, and inspect the entire supporting context before intervening.',

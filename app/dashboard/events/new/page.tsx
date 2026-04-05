@@ -42,6 +42,7 @@ export default function NewEventPage() {
   const [error, setError] = useState('')
   const [profileRole, setProfileRole] = useState<UserRole | null>(null)
   const [regions, setRegions] = useState<RegionOption[]>([])
+  const [demoAutofillEnabled, setDemoAutofillEnabled] = useState(false)
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>([
     { category: 'Venue', description: '', justification: '', estimated_amount: 0, actual_amount: null },
   ])
@@ -102,6 +103,16 @@ export default function NewEventPage() {
         }))
       }
       setRegions((regionsData ?? []) as RegionOption[])
+
+      try {
+        const res = await fetch('/api/app/autofill-settings', { cache: 'no-store' })
+        if (res.ok) {
+          const data = (await res.json()) as { enabled?: boolean }
+          setDemoAutofillEnabled(Boolean(data.enabled))
+        }
+      } catch {
+        setDemoAutofillEnabled(false)
+      }
     }
 
     loadProfile()
@@ -130,42 +141,67 @@ export default function NewEventPage() {
     const uniqueSuffix = String((future.getDate() + now.getMinutes()) % 100).padStart(2, '0')
     const regions = ['Pune', 'Mumbai', 'Nashik', 'Nagpur']
     const goals = ['Capacity Building', 'Community Outreach', 'Awareness Campaign', 'Volunteer Engagement']
-    const venues = ['Shivajinagar Community Hall', 'Aundh Training Centre', 'Kothrud Workshop Space', 'Pimpri Youth Centre']
+    const venues = [
+      {
+        name: 'Shivajinagar Community Hall',
+        map: 'https://maps.google.com/?q=Shivajinagar+Community+Hall+Pune',
+      },
+      {
+        name: 'Aundh Training Centre',
+        map: 'https://maps.google.com/?q=Aundh+Training+Centre+Pune',
+      },
+      {
+        name: 'Kothrud Workshop Space',
+        map: 'https://maps.google.com/?q=Kothrud+Workshop+Space+Pune',
+      },
+      {
+        name: 'Pimpri Youth Centre',
+        map: 'https://maps.google.com/?q=Pimpri+Youth+Centre',
+      },
+    ]
     const pickedRegion = regions[now.getSeconds() % regions.length]
     const pickedGoal = goals[now.getSeconds() % goals.length]
     const pickedVenue = venues[now.getSeconds() % venues.length]
+    const attendeeCount = 60 + (now.getSeconds() % 50)
+    const secondDay = new Date(future)
+    secondDay.setDate(future.getDate() + 1)
 
     setForm((current) => ({
       ...current,
       event_code: `${pickedRegion.slice(0, 3).toUpperCase()}${eventMonth}${uniqueSuffix}`,
-      title: `${pickedGoal} Session ${future.getDate()}`,
-      description: `A focused NGO field event for ${pickedGoal.toLowerCase()} with practical activities, volunteer coordination, and measurable participant outcomes.`,
+      title: `${pickedGoal} Leadership Lab ${future.getDate()}`,
+      description: `A structured NGO field event focused on ${pickedGoal.toLowerCase()}, combining community facilitation, hands-on exercises, partner participation, and measurable follow-up actions for the local region team.`,
       goal: pickedGoal,
       region: pickedRegion,
       event_date: future.toISOString().split('T')[0],
-      event_end_date: future.toISOString().split('T')[0],
+      event_end_date: now.getSeconds() % 3 === 0 ? secondDay.toISOString().split('T')[0] : future.toISOString().split('T')[0],
       start_time: '10:00',
       end_time: '16:00',
-      location: pickedVenue,
-      venue_gmaps_link: 'https://maps.google.com/?q=Shivajinagar+Community+Hall+Pune',
-      expected_attendees: String(60 + (now.getSeconds() % 50)),
-      participant_profile: 'Community volunteers, youth leaders, local NGO staff, and beneficiary representatives.',
+      location: pickedVenue.name,
+      venue_gmaps_link: pickedVenue.map,
+      expected_attendees: String(attendeeCount),
+      participant_profile:
+        'Community volunteers, youth leaders, local NGO staff, beneficiary representatives, and partner coordinators from the target area.',
       coordinator_name: current.coordinator_name || 'Nakul Kokate',
       coordinator_phone: current.coordinator_phone || '9876543210',
       coordinator_email: current.coordinator_email || 'kokatenakul11@gmail.com',
       requires_budget: true,
-      budget_justification: 'Budget needed for venue, refreshments, printed material, and local transport support.',
+      budget_justification:
+        'Budget is required for venue access, participant refreshments, learning materials, local travel support, documentation, and day-of coordination so the event can run at full operational quality.',
       social_media_required: true,
-      social_media_requirements: 'Need 8 to 10 photos, one short reel, and a same-day impact update for NGO channels.',
-      social_media_caption: `Building momentum through ${pickedGoal.toLowerCase()} in ${pickedRegion} with local partners and volunteers.`,
-      social_media_channels: ['Facebook', 'Instagram', 'WhatsApp'],
+      social_media_requirements:
+        'Need 10-12 landscape photos, 2 short vertical reels, one participant quote, one stage/setup shot, and a same-day update draft for coordinator review.',
+      social_media_caption:
+        `A day of ${pickedGoal.toLowerCase()} in ${pickedRegion}, bringing together volunteers, local leaders, and community members for practical action and stronger follow-up on the ground.`,
+      social_media_channels: ['Facebook', 'Instagram', 'LinkedIn', 'WhatsApp'],
     }))
 
     setBudgetLines([
-      { category: 'Venue', description: 'Hall booking', justification: 'Indoor space for full workshop day', estimated_amount: 12000, actual_amount: null },
-      { category: 'Catering', description: 'Lunch and tea', justification: 'Refreshments for participants and volunteers', estimated_amount: 18000, actual_amount: null },
-      { category: 'Printing', description: 'Worksheets and handouts', justification: 'Participant learning material', estimated_amount: 7000, actual_amount: null },
-      { category: 'Transport', description: 'Volunteer travel support', justification: 'Field team local commute', estimated_amount: 5000, actual_amount: null },
+      { category: 'Venue', description: 'Hall booking and utilities', justification: 'Indoor space with seating, power backup, and setup support for the full session', estimated_amount: 12000, actual_amount: null },
+      { category: 'Catering', description: 'Breakfast, tea, lunch, and water', justification: 'Refreshments for participants, volunteers, and partner guests', estimated_amount: 18000, actual_amount: null },
+      { category: 'Printing', description: 'Worksheets, feedback sheets, and signage', justification: 'Participant learning material and event navigation collateral', estimated_amount: 7000, actual_amount: null },
+      { category: 'Transport', description: 'Volunteer and field-team travel support', justification: 'Local commute and material movement on event day', estimated_amount: 5000, actual_amount: null },
+      { category: 'Documentation', description: 'Photo/video support and highlight editing', justification: 'Required for reporting, social communication, and donor-facing storytelling', estimated_amount: 6500, actual_amount: null },
     ])
   }
 
@@ -322,12 +358,16 @@ export default function NewEventPage() {
           subtitle="Build the full EPF with event scope, budget, coordinator details, and social requirements before moving it into review."
         >
           <div className="space-y-3 text-sm text-emerald-50/90">
-            <p>This workspace auto-generates the event code from region and month, and it supports one-click test autofill for faster walkthroughs.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={handleAutofill} className="border-white/20 bg-white/10 text-white hover:bg-white/20">
-                Autofill Test Data
-              </Button>
-            </div>
+            <p>This workspace auto-generates the event code from region and month, and it supports one-click test autofill for faster walkthroughs when demo mode is enabled in Settings.</p>
+            {demoAutofillEnabled ? (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={handleAutofill} className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                  Autofill Test Data
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs app-text-inverse-muted">Demo autofill is currently disabled in Settings.</p>
+            )}
           </div>
         </PageHero>
 

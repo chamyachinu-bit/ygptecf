@@ -6,6 +6,9 @@ type UserRole =
   | 'events_team'
   | 'finance_team'
   | 'accounts_team'
+  | 'bot'
+  | 'designer'
+  | 'social_media_team'
   | 'admin'
 
 type NotificationType =
@@ -19,6 +22,7 @@ type NotificationRecord = {
   id: string
   user_id: string
   event_id: string | null
+  link_path?: string | null
   type: NotificationType
   title: string
   message: string
@@ -53,6 +57,9 @@ type AppSettingsRecord = {
   events_team_test_email?: string | null
   finance_team_test_email?: string | null
   accounts_team_test_email?: string | null
+  bot_test_email?: string | null
+  designer_test_email?: string | null
+  social_media_team_test_email?: string | null
   admin_test_email?: string | null
 }
 
@@ -79,6 +86,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
   events_team: 'Events Team',
   finance_team: 'Finance Team',
   accounts_team: 'Accounts Team',
+  bot: 'Board of Trustees',
+  designer: 'Designer',
+  social_media_team: 'Social Media Team',
   admin: 'Admin',
 }
 
@@ -94,6 +104,12 @@ function getRoleSpecificTestEmail(role: UserRole, settings?: AppSettingsRecord |
       return settings.finance_team_test_email?.trim() || null
     case 'accounts_team':
       return settings.accounts_team_test_email?.trim() || null
+    case 'bot':
+      return settings.bot_test_email?.trim() || null
+    case 'designer':
+      return settings.designer_test_email?.trim() || null
+    case 'social_media_team':
+      return settings.social_media_team_test_email?.trim() || null
     case 'admin':
       return settings.admin_test_email?.trim() || null
   }
@@ -169,6 +185,57 @@ const DEFAULT_TEMPLATES: Record<
       subject: 'Accounts Budget Alert: {{event_title}}',
       body:
         'Hello {{recipient_name}},\n\nA budget alert was raised for "{{event_title}}" ({{event_code}}).\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+  },
+  bot: {
+    approval_required: {
+      subject: 'BOT Oversight Update: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nAn event has reached a point worth trustee visibility.\n\nEvent: {{event_title}} ({{event_code}})\nRegion: {{event_region}}\nDate: {{event_date}}\nLocation: {{event_location}}\n\nNotes:\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    status_changed: {
+      subject: 'BOT Update: {{event_title}} is {{event_status}}',
+      body:
+        'Hello {{recipient_name}},\n\nStatus update for "{{event_title}}" ({{event_code}}): {{event_status}}.\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    budget_flagged: {
+      subject: 'BOT Budget Alert: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nA budget alert was raised for "{{event_title}}" ({{event_code}}).\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+  },
+  designer: {
+    approval_required: {
+      subject: 'Designer Action Needed: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nA visible event may need creative follow-through.\n\nEvent: {{event_title}} ({{event_code}})\nRegion: {{event_region}}\nDate: {{event_date}}\nLocation: {{event_location}}\n\nNotes:\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    status_changed: {
+      subject: 'Designer Update: {{event_title}} is {{event_status}}',
+      body:
+        'Hello {{recipient_name}},\n\nStatus update for "{{event_title}}" ({{event_code}}): {{event_status}}.\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    budget_flagged: {
+      subject: 'Designer Alert: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nA workflow alert was raised for "{{event_title}}" ({{event_code}}).\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+  },
+  social_media_team: {
+    approval_required: {
+      subject: 'Social Media Follow-up: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nAn event has moved into a stage worth social/documentation visibility.\n\nEvent: {{event_title}} ({{event_code}})\nRegion: {{event_region}}\nDate: {{event_date}}\nLocation: {{event_location}}\n\nNotes:\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    status_changed: {
+      subject: 'Social Media Update: {{event_title}} is {{event_status}}',
+      body:
+        'Hello {{recipient_name}},\n\nStatus update for "{{event_title}}" ({{event_code}}): {{event_status}}.\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
+    },
+    budget_flagged: {
+      subject: 'Social Media Alert: {{event_title}}',
+      body:
+        'Hello {{recipient_name}},\n\nA workflow alert was raised for "{{event_title}}" ({{event_code}}).\n\n{{notification_message}}\n\nOpen here:\n{{event_link}}\n',
     },
   },
   admin: {
@@ -249,6 +316,33 @@ function getNotificationTheme(status?: string | null, title?: string, message?: 
     softText: '#166534',
     badge: 'Update',
     buttonText: `Open in ${APP_SHORT_NAME}`,
+  }
+}
+
+function getActionButtonLabel(role: UserRole, type: NotificationType, linkPath?: string | null) {
+  if (linkPath?.includes('/dashboard/flyer-requests')) {
+    return role === 'designer' ? 'Open flyer workflow' : `Open in ${APP_SHORT_NAME}`
+  }
+
+  if (linkPath?.includes('/dashboard/social-workflow')) {
+    return role === 'social_media_team' ? 'Open social workflow' : `Open in ${APP_SHORT_NAME}`
+  }
+
+  switch (type) {
+    case 'approval_required':
+      return role === 'designer'
+        ? 'Open flyer request'
+        : role === 'social_media_team'
+          ? 'Open content request'
+          : 'Open review workspace'
+    case 'budget_flagged':
+      return role === 'bot' ? 'Review leadership summary' : 'Review flagged item'
+    case 'report_due':
+      return 'Open reporting workspace'
+    case 'event_reminder':
+      return 'Open event details'
+    default:
+      return `Open in ${APP_SHORT_NAME}`
   }
 }
 
@@ -351,7 +445,7 @@ serve(async (req) => {
         .single<ProfileRecord>(),
       supabase
         .from('app_settings')
-        .select('media_drive_url, notification_test_email, notification_test_mode, regional_coordinator_test_email, events_team_test_email, finance_team_test_email, accounts_team_test_email, admin_test_email')
+        .select('media_drive_url, notification_test_email, notification_test_mode, regional_coordinator_test_email, events_team_test_email, finance_team_test_email, accounts_team_test_email, bot_test_email, designer_test_email, social_media_team_test_email, admin_test_email')
         .eq('id', 'global')
         .maybeSingle<AppSettingsRecord>(),
       notification.event_id
@@ -383,9 +477,11 @@ serve(async (req) => {
     const templateBody = dbTemplate?.is_active ? dbTemplate.body_template : fallbackTemplate.body
 
     const eventTitle = eventData?.title ?? notification.title
-    const eventLinkUrl = notification.event_id
-      ? `${APP_URL}/dashboard/events/${notification.event_id}`
-      : `${APP_URL}/dashboard`
+    const eventLinkUrl = notification.link_path
+      ? `${APP_URL}${notification.link_path}`
+      : notification.event_id
+        ? `${APP_URL}/dashboard/events/${notification.event_id}`
+        : `${APP_URL}/dashboard`
 
     const variables = {
       recipient_name: profile.full_name,
@@ -413,6 +509,7 @@ serve(async (req) => {
           ? roleSpecificTestEmail || profile.email
           : profile.email
     const theme = getNotificationTheme(eventData?.status, notification.title, notification.message)
+    const actionButtonLabel = getActionButtonLabel(profile.role, notification.type, notification.link_path)
 
     const htmlBody = `
       <!DOCTYPE html>
@@ -435,7 +532,7 @@ serve(async (req) => {
           ${toHtmlParagraphs(renderedBody)}
           <p style="margin-top:20px">
             <a href="${eventLinkUrl}" style="display:inline-block;background:${theme.accent};color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600">
-              ${theme.buttonText}
+              ${escapeHtml(actionButtonLabel || theme.buttonText)}
             </a>
           </p>
           ${appSettings?.media_drive_url ? `<p style="margin-top:14px"><a href="${appSettings.media_drive_url}" style="color:#2563eb;text-decoration:none">Open shared media drive</a></p>` : ''}

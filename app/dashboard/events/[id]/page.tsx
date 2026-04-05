@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Clock, ExternalLink, MapPin, Target, Users } from 'lucide-react'
@@ -12,7 +12,8 @@ import { StatusBadge } from '@/components/events/StatusBadge'
 import { EmptyState, PageHero, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { formatCurrency, formatDate, formatRelative } from '@/lib/utils/formatters'
 import { ROLE_REVIEWABLE_STATUSES } from '@/lib/utils/permissions'
-import type { Approval, Budget, EventFile, EventReport } from '@/types/database'
+import { prettyWorkflowStatus } from '@/lib/workflows/creative'
+import type { Approval, Budget, EventFile, EventReport, FlyerRequest, SocialWorkflowItem } from '@/types/database'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -27,6 +28,45 @@ export default async function EventDetailPage({ params }: PageProps) {
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+
+  if (profile?.role === 'designer' || profile?.role === 'social_media_team') {
+    const service = await createServiceClient()
+    const [{ data: eventData }, { data: reportData }, { data: flyerData }, { data: socialData }] = await Promise.all([
+      service.from('events').select('*').eq('id', id).single(),
+      service.from('event_reports').select('*').eq('event_id', id).maybeSingle(),
+      service.from('flyer_requests').select('*').eq('event_id', id).maybeSingle(),
+      service.from('social_workflow_items').select('*').eq('event_id', id).maybeSingle(),
+    ])
+
+    const event = eventData
+    if (!event) notFound()
+
+    if (profile.role === 'designer') {
+      if (!flyerData && !event.social_media_required) {
+        redirect('/dashboard/flyer-requests')
+      }
+      return (
+        <CreativeContextView
+          mode="designer"
+          event={event}
+          flyerRequest={(flyerData as FlyerRequest | null) ?? null}
+        />
+      )
+    }
+
+    if (!reportData) {
+      redirect('/dashboard/social-workflow')
+    }
+
+    return (
+      <CreativeContextView
+        mode="social"
+        event={event}
+        report={(reportData as EventReport | null) ?? null}
+        socialWorkflow={(socialData as SocialWorkflowItem | null) ?? null}
+      />
+    )
+  }
 
   const [{ data: event }, { data: directReport }] = await Promise.all([
     supabase
@@ -404,5 +444,154 @@ function ArchiveButton({ eventId }: { eventId: string }) {
     >
       <Button size="sm" variant="outline" type="submit">Archive Event</Button>
     </form>
+  )
+}
+
+function CreativeContextView({
+  mode,
+  event,
+  report,
+  flyerRequest,
+  socialWorkflow,
+}: {
+  mode: 'designer' | 'social'
+  event: {
+    id: string
+    event_code: string
+    title: string
+    description: string | null
+    goal: string | null
+    region: string
+    event_date: string
+    location: string
+    expected_attendees: number
+    social_media_required?: boolean
+    social_media_requirements?: string | null
+    social_media_caption?: string | null
+    social_media_channels?: string[]
+    proposal_drive_url?: string | null
+    media_drive_url?: string | null
+    report_drive_url?: string | null
+  }
+  report?: EventReport | null
+  flyerRequest?: FlyerRequest | null
+  socialWorkflow?: SocialWorkflowItem | null
+}) {
+  const isSocial = mode === 'social'
+
+  return (
+    <div>
+      <PageShell>
+        <PageHero
+          lead={
+            <Link href={isSocial ? '/dashboard/social-workflow' : '/dashboard/flyer-requests'}>
+              <Button size="sm" variant="secondary" className="border border-white/80 bg-white text-slate-900 shadow-lg hover:bg-slate-100">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to {isSocial ? 'Social Workflow' : 'Flyer Requests'}
+              </Button>
+            </Link>
+          }
+          eyebrow={isSocial ? 'Social-safe event context' : 'Creative event context'}
+          title={`${event.event_code} · ${event.title}`}
+          subtitle={
+            isSocial
+              ? 'This view is intentionally limited to event-story context, participation, and narrative reporting. Finance data is hidden.'
+              : 'This view is intentionally limited to flyer-relevant context, creative brief content, and shared folders.'
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-emerald-100/70">Region</p>
+              <p className="mt-2 text-lg font-semibold">{event.region}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-emerald-100/70">Workflow status</p>
+              <p className="mt-2 text-lg font-semibold">
+                {prettyWorkflowStatus(isSocial ? (socialWorkflow?.status ?? 'requested') : (flyerRequest?.status ?? 'requested'))}
+              </p>
+            </div>
+          </div>
+        </PageHero>
+
+        <StatGrid>
+          <StatCard label="Date" value={formatDate(event.event_date)} helper="Event schedule context" />
+          <StatCard label="Venue" value={event.location} helper="Location for creative alignment" />
+          <StatCard
+            label={isSocial ? 'Participants' : 'Expected attendees'}
+            value={String(isSocial ? (report?.actual_attendees ?? event.expected_attendees) : event.expected_attendees)}
+            helper={isSocial ? 'Actual attendance or fallback expected count' : 'Audience sizing for flyer copy'}
+          />
+          <StatCard
+            label={isSocial ? 'Narrative status' : 'Creative brief'}
+            value={isSocial ? (report?.outcome_summary ? 'Ready' : 'Pending') : (event.social_media_required ? 'Enabled' : 'General')}
+            helper={isSocial ? 'Outcome summary available for storytelling' : 'Use the creative details below'}
+          />
+        </StatGrid>
+
+        <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-6">
+            <SectionBlock
+              title={isSocial ? 'Event story context' : 'Creative brief context'}
+              subtitle={isSocial ? 'Only the text and metrics relevant for social storytelling are shown below.' : 'Use this brief to prepare flyer design without operational clutter.'}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <InfoBlock title="Goal" value={event.goal || 'General event'} />
+                <InfoBlock title="Description" value={event.description} fallback="No extended description provided." />
+                {!isSocial && (
+                  <InfoBlock
+                    title="Creative Requirements"
+                    value={[event.social_media_requirements, event.social_media_caption, event.social_media_channels?.join(', ')].filter(Boolean).join('\n\n')}
+                    fallback="No extra creative requirements were provided."
+                  />
+                )}
+                {isSocial && (
+                  <>
+                    <InfoBlock title="Outcome Summary" value={report?.outcome_summary} fallback="Outcome summary not available yet." />
+                    <InfoBlock title="Execution Summary" value={report?.execution_details} fallback="Execution summary not available yet." />
+                    <InfoBlock title="Challenges / Lessons" value={[report?.challenges, report?.lessons_learned].filter(Boolean).join('\n\n')} fallback="No narrative learning notes available yet." />
+                    <InfoBlock title="Follow-up / Social Writeup" value={[report?.follow_up_actions, report?.social_media_writeup].filter(Boolean).join('\n\n')} fallback="No follow-up or social writeup recorded yet." />
+                  </>
+                )}
+              </div>
+            </SectionBlock>
+
+            <SectionBlock
+              title="Relevant folders"
+              subtitle={isSocial ? 'Only the content-supporting folders are surfaced here.' : 'Use these shared folders for the flyer handoff and creative reference.'}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  { label: 'Proposal Folder', url: event.proposal_drive_url },
+                  { label: 'Media Folder', url: event.media_drive_url },
+                  ...(isSocial ? [{ label: 'Report Folder', url: event.report_drive_url }] : []),
+                ].map((link) => (
+                  <div key={link.label} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="font-semibold text-slate-900">{link.label}</p>
+                    {link.url ? (
+                      <a href={link.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:underline">
+                        <ExternalLink className="h-4 w-4" />
+                        Open folder
+                      </a>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">Link not configured yet.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </SectionBlock>
+          </div>
+
+          <div className="space-y-6">
+            <SectionBlock title="Access guard" subtitle="This role-safe page intentionally hides finance and approval actions.">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
+                {isSocial
+                  ? 'Budgets, donations, invoices, variance tables, report exports, and reviewer controls are hidden here by design.'
+                  : 'Approvals, budgets, reports, and finance controls are hidden here by design so the designer can focus only on creative delivery.'}
+              </div>
+            </SectionBlock>
+          </div>
+        </div>
+      </PageShell>
+    </div>
   )
 }

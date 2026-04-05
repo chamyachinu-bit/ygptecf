@@ -77,6 +77,7 @@ export default function ReportPage() {
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [demoAutofillEnabled, setDemoAutofillEnabled] = useState(false)
   const [form, setForm] = useState<ReportFormState>(EMPTY_FORM)
 
   useEffect(() => {
@@ -98,6 +99,15 @@ export default function ReportPage() {
       ])
 
       if (!eventData) return
+      const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user?.id ?? '').single()
+      if (profileData?.role === 'designer') {
+        router.replace('/dashboard/flyer-requests')
+        return
+      }
+      if (profileData?.role === 'social_media_team') {
+        router.replace('/dashboard/social-workflow')
+        return
+      }
 
       setEvent(eventData)
       setExistingReport(savedReport ?? null)
@@ -126,6 +136,16 @@ export default function ReportPage() {
         social_media_writeup: savedReport?.social_media_writeup || '',
         follow_up_actions: savedReport?.follow_up_actions || '',
       })
+
+      try {
+        const res = await fetch('/api/app/autofill-settings', { cache: 'no-store' })
+        if (res.ok) {
+          const data = (await res.json()) as { enabled?: boolean }
+          setDemoAutofillEnabled(Boolean(data.enabled))
+        }
+      } catch {
+        setDemoAutofillEnabled(false)
+      }
     }
 
     load()
@@ -147,34 +167,35 @@ export default function ReportPage() {
     if (!event) return
     const now = new Date()
     const actualAttendees = Math.max(25, event.expected_attendees - ((now.getMinutes() % 12) + 3))
+    const attendanceShare = Math.round((actualAttendees / Math.max(event.expected_attendees, 1)) * 100)
 
     setForm({
       actual_attendees: String(actualAttendees),
       execution_details:
-        'The event opened with welcome remarks, followed by focused sessions, group activities, and a structured close-out. Attendance remained stable and participants stayed engaged across the day.',
+        'The event opened with registration, a short welcome, and a structured agenda covering the planned sessions, breakout participation, practical discussion rounds, and a coordinated close-out. Volunteer coordination improved the session flow and participant engagement remained strong across the day.',
       outcome_summary:
-        'Participants completed the planned activities, generated practical action ideas, and responded positively to the event format and coordination.',
+        `Participants completed the planned activities, contributed actively during discussion rounds, and generated practical next steps for local follow-up. Attendance reached about ${attendanceShare}% of the original projection, and the response to the format and facilitation remained positive.`,
       challenges:
-        'Registration and AV setup caused a short delay at the start, but the team quickly recovered the flow.',
+        'Registration ran slightly slower than expected at the start and the AV setup required extra coordination, but the facilitation team recovered the flow without affecting the core agenda.',
       lessons_learned:
-        'Technical setup should begin earlier, and a separate registration volunteer should be assigned before the event opens.',
+        'Technical setup should begin earlier, one volunteer should be assigned exclusively to registration, and session materials should be packed in advance with a clearer handover plan.',
       budget_notes:
-        'Refreshments came in slightly below estimate while printed material required a few extra copies.',
-      donations_received: String(1000 + (now.getSeconds() % 5) * 250),
-      donation_notes: 'Local partner contributed cash support and some in-kind refreshments.',
-      actual_start_time: '10:15',
-      actual_end_time: '15:45',
+        'Refreshments came in slightly below estimate while extra participant handouts and documentation support pushed a few lines upward. Overall variance stayed within an acceptable operational range.',
+      donations_received: String(1500 + (now.getSeconds() % 5) * 500),
+      donation_notes: 'A local partner supported refreshments and a small cash contribution was collected during the event for follow-up support.',
+      actual_start_time: '10:12',
+      actual_end_time: '16:05',
       actual_location: event.location,
       social_media_writeup:
-        'Published a same-day event summary with participant photos, key takeaways, and a short impact-oriented caption.',
+        `Published a same-day impact summary highlighting ${event.goal?.toLowerCase() || 'the event'}, key participant takeaways, volunteer participation, and photo-based documentation for NGO channels.`,
       follow_up_actions:
-        'Share summary notes with stakeholders, schedule a follow-up review, and track participant action commitments.',
+        'Share summary notes with stakeholders, circulate attendance and outcome highlights, schedule a follow-up review call, and track participant commitments through the regional team.',
     })
 
     setBudgetLines((current) =>
       current.map((line, index) => ({
         ...line,
-        actual_amount: Math.max(0, Number(line.estimated_amount) - (index % 2 === 0 ? 0 : 100) + (index === 2 ? 150 : 0)),
+        actual_amount: Math.max(0, Number(line.estimated_amount) - (index % 2 === 0 ? 150 : 75) + (index === 2 ? 220 : index === 4 ? 180 : 0)),
       }))
     )
   }
@@ -257,17 +278,17 @@ export default function ReportPage() {
 
   return (
     <div>
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
+      <div className="border-b app-border-soft app-panel px-6 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href={`/dashboard/events/${id}`}>
-              <button className="rounded p-1.5 hover:bg-gray-100">
+              <button className="app-nav-button rounded-xl p-2 hover:bg-[var(--app-surface-soft)]">
                 <ArrowLeft className="h-4 w-4" />
               </button>
             </Link>
             <div>
-              <h1 className="text-xl font-semibold">Event Completion Report</h1>
-              <p className="text-sm text-gray-500">{event.event_code} - {event.title}</p>
+              <h1 className="app-text-strong text-xl font-semibold">Event Completion Report</h1>
+              <p className="app-text-muted text-sm">{event.event_code} - {event.title}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -279,21 +300,25 @@ export default function ReportPage() {
             {existingReport && (
               <GeneratePdfButton href={`/api/events/${id}/final-report-pdf`} />
             )}
-            <Button type="button" variant="outline" onClick={handleAutofill}>
-              Autofill Test Data
-            </Button>
+            {demoAutofillEnabled ? (
+              <Button type="button" variant="outline" onClick={handleAutofill}>
+                Autofill Test Data
+              </Button>
+            ) : (
+              <span className="app-text-muted text-xs">Demo autofill is disabled in Settings.</span>
+            )}
           </div>
         </div>
       </div>
 
       <div className="mx-auto grid max-w-7xl gap-6 p-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <Card className="border-green-200 bg-gradient-to-r from-green-50 via-white to-emerald-50">
+          <Card className="border-emerald-500/20 bg-[linear-gradient(135deg,color-mix(in_srgb,#22c55e_12%,var(--app-surface-strong)_88%),var(--app-surface-strong)_55%,color-mix(in_srgb,#0ea5e9_8%,var(--app-surface-strong)_92%))]">
             <CardHeader>
               <CardTitle>ECR Workspace</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="app-text-muted text-sm">
                 Capture the actual execution of the event, document changes from the original proposal, and prepare a clean final report for leadership, Finance, and Accounts.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -301,7 +326,7 @@ export default function ReportPage() {
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className="rounded-full border border-green-200 bg-white px-3 py-1 text-sm font-medium text-green-800 hover:bg-green-100"
+                    className="app-nav-button rounded-full px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-[var(--app-surface-soft)] dark:text-emerald-300"
                   >
                     {section.label}
                   </a>
@@ -436,18 +461,18 @@ export default function ReportPage() {
                   {budgetLines.length > 0 ? (
                     <BudgetLineItems items={budgetLines} onChange={setBudgetLines} showActual />
                   ) : (
-                    <p className="text-sm text-gray-500">No budget lines were submitted on the EPF.</p>
+                    <p className="app-text-muted text-sm">No budget lines were submitted on the EPF.</p>
                   )}
 
                   {budgetLines.length > 0 && (
-                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <div className="app-panel-soft overflow-x-auto rounded-xl">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
+                        <thead className="app-table-head">
                           <tr className="text-left">
-                            <th className="px-4 py-3 font-medium text-gray-500">Category</th>
-                            <th className="px-4 py-3 font-medium text-gray-500">Proposed</th>
-                            <th className="px-4 py-3 font-medium text-gray-500">Actual</th>
-                            <th className="px-4 py-3 font-medium text-gray-500">Variance</th>
+                            <th className="app-text-subtle px-4 py-3 font-medium">Category</th>
+                            <th className="app-text-subtle px-4 py-3 font-medium">Proposed</th>
+                            <th className="app-text-subtle px-4 py-3 font-medium">Actual</th>
+                            <th className="app-text-subtle px-4 py-3 font-medium">Variance</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -456,11 +481,11 @@ export default function ReportPage() {
                             const actual = Number(line.actual_amount) || 0
                             const variance = actual - proposed
                             return (
-                              <tr key={`${line.category}-${index}`} className="border-t border-gray-100">
-                                <td className="px-4 py-3 font-medium text-gray-900">{line.category}</td>
-                                <td className="px-4 py-3 text-gray-700">Rs {proposed.toLocaleString('en-IN')}</td>
-                                <td className="px-4 py-3 text-gray-700">Rs {actual.toLocaleString('en-IN')}</td>
-                                <td className={`px-4 py-3 font-medium ${variance > 0 ? 'text-red-600' : variance < 0 ? 'text-green-700' : 'text-gray-700'}`}>
+                              <tr key={`${line.category}-${index}`} className="app-table-row border-t">
+                                <td className="app-text-strong px-4 py-3 font-medium">{line.category}</td>
+                                <td className="app-text-muted px-4 py-3">Rs {proposed.toLocaleString('en-IN')}</td>
+                                <td className="app-text-muted px-4 py-3">Rs {actual.toLocaleString('en-IN')}</td>
+                                <td className={`px-4 py-3 font-medium ${variance > 0 ? 'text-red-600 dark:text-red-300' : variance < 0 ? 'text-emerald-700 dark:text-emerald-300' : 'app-text-muted'}`}>
                                   {variance > 0 ? '+' : ''}Rs {variance.toLocaleString('en-IN')}
                                 </td>
                               </tr>
@@ -545,11 +570,11 @@ export default function ReportPage() {
             </section>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>
+              <div className="app-danger-soft rounded-md p-3 text-sm">{error}</div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4">
-              <p className="text-sm text-gray-600">
+            <div className="app-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4">
+              <p className="app-text-muted text-sm">
                 {existingReport
                   ? 'Updating this report will refresh the final report layout and keep your previous data editable.'
                   : 'Submitting this report will create the final report view automatically.'}
@@ -593,11 +618,11 @@ export default function ReportPage() {
             <CardHeader>
               <CardTitle>Editing Guidance</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-gray-600">
+            <CardContent className="app-text-muted space-y-3 text-sm">
               <p>Use actual execution details rather than repeating proposal wording.</p>
               <p>Highlight what changed, what worked, and what should improve next time.</p>
               <p>Finance and Accounts will compare this report with the original EPF and budget lines.</p>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
+              <div className="app-warning-soft rounded-xl p-3">
                 <div className="flex items-start gap-2">
                   <Flag className="mt-0.5 h-4 w-4" />
                   <p>
@@ -626,7 +651,7 @@ function FieldShell({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
-      <p className="text-xs text-gray-500">{helper}</p>
+      <p className="app-text-subtle text-xs">{helper}</p>
     </div>
   )
 }
@@ -641,10 +666,10 @@ function MetricCard({
   tone: 'green' | 'cyan' | 'red' | 'slate'
 }) {
   const toneMap = {
-    green: 'border-green-200 bg-green-50 text-green-800',
-    cyan: 'border-cyan-200 bg-cyan-50 text-cyan-800',
-    red: 'border-red-200 bg-red-50 text-red-700',
-    slate: 'border-gray-200 bg-gray-50 text-gray-800',
+    green: 'app-success-soft',
+    cyan: 'app-info-soft',
+    red: 'app-danger-soft',
+    slate: 'app-panel-soft app-text-strong',
   }
 
   return (
@@ -665,11 +690,11 @@ function SummaryRow({
   value: string
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-3">
-      <div className="mt-0.5 text-gray-500">{icon}</div>
+    <div className="app-panel-soft flex items-start gap-3 rounded-lg p-3">
+      <div className="app-text-subtle mt-0.5">{icon}</div>
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-        <p className="font-medium text-gray-900">{value}</p>
+        <p className="app-text-subtle text-xs uppercase tracking-wide">{label}</p>
+        <p className="app-text-strong font-medium">{value}</p>
       </div>
     </div>
   )

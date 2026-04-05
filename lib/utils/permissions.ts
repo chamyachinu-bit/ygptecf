@@ -5,6 +5,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   events_team: 'Events Team',
   finance_team: 'Finance Team',
   accounts_team: 'Accounts Team',
+  bot: 'Board of Trustees',
+  designer: 'Designer',
+  social_media_team: 'Social Media Team',
   admin: 'Admin',
 }
 
@@ -33,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'history:read:any',
     'approvals:create:finance_team',
     'budgets:read',
+    'reports:read:any',
     'files:read',
     'notifications:read:own',
   ],
@@ -42,7 +46,24 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'history:read:any',
     'approvals:create:accounts_team',
     'budgets:read',
+    'reports:read:any',
     'files:read',
+    'notifications:read:own',
+  ],
+  bot: [
+    'events:read:any',
+    'history:read:any',
+    'reports:read:any',
+    'notifications:read:own',
+  ],
+  designer: [
+    'workflow:flyer:read',
+    'workflow:flyer:update',
+    'notifications:read:own',
+  ],
+  social_media_team: [
+    'workflow:social:read',
+    'workflow:social:update',
     'notifications:read:own',
   ],
   admin: ['*'],

@@ -3,10 +3,21 @@ import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdvancedAnalytics } from '@/components/dashboard/AdvancedAnalytics'
+import { ResultNavigation } from '@/components/ui/result-navigation'
 import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { can, ROLE_LABELS } from '@/lib/utils/permissions'
 import { formatCurrency } from '@/lib/utils/formatters'
-import type { Event, EventReport, EventStatus, Profile, UserRole } from '@/types/database'
+import {
+  buildAnalysisRows,
+  buildGoalData,
+  buildMonthlyData,
+  buildRegionData,
+  filterAnalysisRows,
+  getMonthLabel,
+  summarizeStatus,
+  type EventWithAnalyticsRelations,
+} from '@/lib/analytics/event-analytics'
+import type { EventReport, EventStatus, Profile } from '@/types/database'
 
 type SearchParams = {
   q?: string
@@ -14,28 +25,13 @@ type SearchParams = {
   region?: string
   status?: string
   goal?: string
-}
-
-type EventWithRelations = Event & {
-  budgets?: Event['budgets']
-}
-
-type EventAnalysisRow = {
-  id: string
-  eventCode: string
-  title: string
-  region: string
-  goal: string
-  status: EventStatus
-  monthKey: string
-  monthLabel: string
-  expectedAttendees: number
-  actualAttendees: number
-  plannedBudget: number
-  actualBudget: number
-  donations: number
-  reportSubmitted: boolean
-  invoiceCount: number
+  report_state?: string
+  budget_band?: string
+  variance?: string
+  sort?: string
+  detail_q?: string
+  detail_size?: string
+  detail_page?: string
 }
 
 const STATUS_COLORS: Record<EventStatus, string> = {
@@ -51,23 +47,6 @@ const STATUS_COLORS: Record<EventStatus, string> = {
   archived: '#6b7280',
 }
 
-function getMonthKey(date: string | null | undefined, fallback: string) {
-  const base = date ? new Date(`${date}T00:00:00`) : new Date(fallback)
-  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`
-}
-
-function getMonthLabel(monthKey: string) {
-  const [year, month] = monthKey.split('-').map(Number)
-  return new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'short', year: 'numeric' })
-}
-
-function summarizeStatus(status: EventStatus) {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const filters = await searchParams
   const supabase = await createClient()
@@ -79,6 +58,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const profile = profileData as Profile | null
   if (!profile) redirect('/login')
+
+  if (profile.role === 'designer') redirect('/dashboard/flyer-requests')
+  if (profile.role === 'social_media_team') redirect('/dashboard/social-workflow')
 
   let eventsQuery = supabase
     .from('events')
@@ -92,7 +74,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   }
 
   const { data: eventsData } = await eventsQuery
-  const events = (eventsData ?? []) as EventWithRelations[]
+  const events = (eventsData ?? []) as EventWithAnalyticsRelations[]
   const visibleEventIds = events.map((event) => event.id)
 
   const [reportsResult] = await Promise.all([
@@ -102,41 +84,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   ])
 
   const reports = (reportsResult.data ?? []) as EventReport[]
-  const reportByEventId = new Map(reports.map((report) => [report.event_id, report]))
-
-  const rows: EventAnalysisRow[] = events.map((event) => {
-    const report = reportByEventId.get(event.id)
-    const plannedBudget = event.budgets?.reduce((sum, line) => sum + line.estimated_amount, 0) ?? 0
-    const actualBudget = event.budgets?.reduce((sum, line) => sum + (line.actual_amount ?? 0), 0) ?? 0
-    const monthKey = getMonthKey(event.event_date, event.created_at)
-    return {
-      id: event.id,
-      eventCode: event.event_code ?? 'Pending code',
-      title: event.title,
-      region: event.region,
-      goal: event.goal ?? 'Unspecified',
-      status: event.status,
-      monthKey,
-      monthLabel: getMonthLabel(monthKey),
-      expectedAttendees: event.expected_attendees ?? 0,
-      actualAttendees: report?.actual_attendees ?? 0,
-      plannedBudget,
-      actualBudget,
-      donations: report?.donations_received ?? 0,
-      reportSubmitted: Boolean(report),
-      invoiceCount: event.files?.filter((file) => file.file_type === 'invoice_document').length ?? 0,
-    }
-  })
-
-  const filteredRows = rows.filter((row) => {
-    const haystack = `${row.eventCode} ${row.title} ${row.region} ${row.goal}`.toLowerCase()
-    const matchesSearch = !filters.q || haystack.includes(filters.q.toLowerCase())
-    const matchesMonth = !filters.month || row.monthKey === filters.month
-    const matchesRegion = !filters.region || row.region === filters.region
-    const matchesStatus = !filters.status || row.status === filters.status
-    const matchesGoal = !filters.goal || row.goal === filters.goal
-    return matchesSearch && matchesMonth && matchesRegion && matchesStatus && matchesGoal
-  })
+  const rows = buildAnalysisRows(events, reports)
+  const filteredRows = filterAnalysisRows(rows, filters)
 
   const totalEvents = filteredRows.length
   const fundedEvents = filteredRows.filter((row) => row.status === 'funded').length
@@ -156,65 +105,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       )
     : 0
 
-  const monthMap = new Map<string, {
-    month: string
-    events: number
-    funded: number
-    completed: number
-    plannedBudget: number
-    actualBudget: number
-    donations: number
-  }>()
-
-  filteredRows.forEach((row) => {
-    const bucket = monthMap.get(row.monthKey) ?? {
-      month: row.monthLabel,
-      events: 0,
-      funded: 0,
-      completed: 0,
-      plannedBudget: 0,
-      actualBudget: 0,
-      donations: 0,
-    }
-    bucket.events += 1
-    if (row.status === 'funded') bucket.funded += 1
-    if (['completed', 'report_submitted', 'archived'].includes(row.status)) bucket.completed += 1
-    bucket.plannedBudget += row.plannedBudget
-    bucket.actualBudget += row.actualBudget
-    bucket.donations += row.donations
-    monthMap.set(row.monthKey, bucket)
-  })
-
-  const monthlyData = Array.from(monthMap.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .slice(-12)
-    .map(([, value]) => value)
-
-  const regionMap = new Map<string, { region: string; events: number; plannedBudget: number; actualBudget: number; completed: number }>()
-  filteredRows.forEach((row) => {
-    const bucket = regionMap.get(row.region) ?? {
-      region: row.region,
-      events: 0,
-      plannedBudget: 0,
-      actualBudget: 0,
-      completed: 0,
-    }
-    bucket.events += 1
-    bucket.plannedBudget += row.plannedBudget
-    bucket.actualBudget += row.actualBudget
-    if (['completed', 'report_submitted', 'archived'].includes(row.status)) bucket.completed += 1
-    regionMap.set(row.region, bucket)
-  })
-  const regionData = Array.from(regionMap.values()).sort((a, b) => b.events - a.events)
-
-  const goalMap = new Map<string, number>()
-  filteredRows.forEach((row) => {
-    goalMap.set(row.goal, (goalMap.get(row.goal) ?? 0) + 1)
-  })
-  const goalData = Array.from(goalMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([goal, events]) => ({ goal, events }))
+  const monthlyData = buildMonthlyData(filteredRows)
+  const regionData = buildRegionData(filteredRows)
+  const goalData = buildGoalData(filteredRows)
 
   const statusMap = new Map<EventStatus, number>()
   filteredRows.forEach((row) => {
@@ -229,10 +122,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const topRegion = regionData[0]?.region ?? 'N/A'
   const strongestMonth = monthlyData.reduce(
     (best, row) => (row.events > best.events ? row : best),
-    monthlyData[0] ?? { month: 'N/A', events: 0, funded: 0, completed: 0, plannedBudget: 0, actualBudget: 0, donations: 0 }
+    monthlyData[0] ?? { month: 'N/A', events: 0, funded: 0, completed: 0, plannedBudget: 0, actualBudget: 0, donations: 0, expectedAttendees: 0, actualAttendees: 0 }
   )
   const budgetUtilization = plannedBudget > 0 ? Math.round((actualBudget / plannedBudget) * 100) : 0
   const invoiceCoverage = totalEvents ? Math.round((filteredRows.filter((row) => row.invoiceCount > 0).length / totalEvents) * 100) : 0
+  const overspendEvents = filteredRows.filter((row) => row.budgetVariance > 0).length
+  const reportPending = filteredRows.filter((row) => !row.reportSubmitted).length
+  const avgDonation = totalEvents ? Math.round(donations / totalEvents) : 0
 
   const summaryCards = [
     { label: 'Events In Scope', value: totalEvents.toString(), helper: `${profile.role === 'admin' ? 'System-wide' : ROLE_LABELS[profile.role]} view` },
@@ -247,6 +143,31 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const statusOptions = [...new Set(rows.map((row) => row.status))]
   const goalOptions = [...new Set(rows.map((row) => row.goal))].sort((a, b) => a.localeCompare(b))
   const monthOptions = [...new Set(rows.map((row) => row.monthKey))].sort((a, b) => a.localeCompare(b))
+  const detailQuery = (filters.detail_q ?? '').trim().toLowerCase()
+  const detailSize = [10, 25, 50, 100].includes(Number(filters.detail_size)) ? Number(filters.detail_size) : 25
+  const detailPage = Math.max(Number(filters.detail_page ?? '1') || 1, 1)
+  const detailFilteredRows = filteredRows.filter((row) => {
+    if (!detailQuery) return true
+    const haystack = `${row.eventCode} ${row.title} ${row.region} ${row.goal}`.toLowerCase()
+    return haystack.includes(detailQuery)
+  })
+  const detailPageCount = Math.max(1, Math.ceil(detailFilteredRows.length / detailSize))
+  const safeDetailPage = Math.min(detailPage, detailPageCount)
+  const detailVisibleRows = detailFilteredRows.slice((safeDetailPage - 1) * detailSize, safeDetailPage * detailSize)
+  const detailQueryState = {
+    q: filters.q ?? '',
+    month: filters.month ?? '',
+    region: filters.region ?? '',
+    status: filters.status ?? '',
+    goal: filters.goal ?? '',
+    report_state: filters.report_state ?? '',
+    budget_band: filters.budget_band ?? '',
+    variance: filters.variance ?? '',
+    sort: filters.sort ?? 'newest',
+    detail_q: filters.detail_q ?? '',
+    detail_size: detailSize,
+    detail_page: safeDetailPage,
+  }
 
   return (
     <div>
@@ -302,9 +223,50 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                   <option key={goal} value={goal}>{goal}</option>
                 ))}
               </select>
+              <select name="report_state" defaultValue={filters.report_state ?? ''} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                <option value="">All report states</option>
+                <option value="reported">Reported only</option>
+                <option value="pending">Report pending</option>
+              </select>
+              <select name="budget_band" defaultValue={filters.budget_band ?? ''} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                <option value="">All budget bands</option>
+                <option value="light">Light: under Rs 25k</option>
+                <option value="core">Core: Rs 25k-75k</option>
+                <option value="major">Major: Rs 75k-1.5L</option>
+                <option value="flagship">Flagship: above Rs 1.5L</option>
+              </select>
+              <select name="variance" defaultValue={filters.variance ?? ''} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                <option value="">All variance states</option>
+                <option value="overspend">Overspend</option>
+                <option value="savings">Savings</option>
+                <option value="on_plan">On plan</option>
+              </select>
+              <select name="sort" defaultValue={filters.sort ?? 'newest'} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="budget_desc">Highest budget</option>
+                <option value="variance_desc">Largest variance</option>
+                <option value="attendance_desc">Highest attendance</option>
+              </select>
               <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
                 Apply Filters
               </button>
+              <a
+                href={`/api/admin/analytics/export?${new URLSearchParams({
+                  q: filters.q ?? '',
+                  month: filters.month ?? '',
+                  region: filters.region ?? '',
+                  status: filters.status ?? '',
+                  goal: filters.goal ?? '',
+                  report_state: filters.report_state ?? '',
+                  budget_band: filters.budget_band ?? '',
+                  variance: filters.variance ?? '',
+                  sort: filters.sort ?? 'newest',
+                }).toString()}`}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Export CSV
+              </a>
             </form>
           </CardContent>
         </Card>
@@ -350,6 +312,20 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                   {onHoldEvents} on hold, {rejectedEvents} rejected.
                 </p>
               </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Overspend exposure</p>
+                <p className="mt-2 text-lg font-semibold text-gray-900">{overspendEvents}</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Events where actuals are already above planned values.
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Reporting gap</p>
+                <p className="mt-2 text-lg font-semibold text-gray-900">{reportPending}</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Visible events still missing a submitted completion report.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -361,6 +337,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
               <p>Use month, region, status, and goal filters to study different operating windows for leadership review.</p>
               <p>This view combines event pipeline, financial movement, attendance, donation capture, and report completion signals.</p>
               <p>Invoice coverage helps leadership understand whether supporting finance documentation is being uploaded alongside execution evidence.</p>
+              <p>CSV export respects the active filter scope so BOT, Finance, and Admin can take audit-ready analysis snapshots.</p>
             </CardContent>
           </Card>
         </div>
@@ -443,11 +420,43 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </Card>
         </div>
 
-        <Card>
+        <Card id="detailed-event-analysis">
           <CardHeader>
             <CardTitle>Detailed Event Analysis</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="space-y-4">
+            <form action="/dashboard/admin/analytics#detailed-event-analysis" className="grid gap-3 md:grid-cols-[1.6fr_auto]">
+              <input type="hidden" name="q" value={filters.q ?? ''} />
+              <input type="hidden" name="month" value={filters.month ?? ''} />
+              <input type="hidden" name="region" value={filters.region ?? ''} />
+              <input type="hidden" name="status" value={filters.status ?? ''} />
+              <input type="hidden" name="goal" value={filters.goal ?? ''} />
+              <input type="hidden" name="detail_size" value={String(detailSize)} />
+              <input
+                type="text"
+                name="detail_q"
+                defaultValue={filters.detail_q ?? ''}
+                placeholder="Quick search event code, title, region, or goal"
+                className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm"
+              />
+              <button className="rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-medium text-white hover:from-green-700 hover:to-emerald-700">
+                Search Rows
+              </button>
+            </form>
+
+            <ResultNavigation
+              pathname="/dashboard/admin/analytics"
+              query={detailQueryState}
+              sizeParam="detail_size"
+              pageParam="detail_page"
+              currentSize={detailSize}
+              currentPage={safeDetailPage}
+              totalCount={detailFilteredRows.length}
+              label="Detailed Event Analysis"
+              anchorId="detailed-event-analysis"
+            />
+
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
@@ -457,12 +466,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                   <th className="py-3 pr-4 text-xs uppercase text-gray-500">Goal</th>
                   <th className="py-3 pr-4 text-xs uppercase text-gray-500">Expected / Actual</th>
                   <th className="py-3 pr-4 text-xs uppercase text-gray-500">Planned / Actual Budget</th>
-                  <th className="py-3 pr-4 text-xs uppercase text-gray-500">Donations</th>
-                  <th className="py-3 pr-4 text-xs uppercase text-gray-500">Invoices</th>
-                </tr>
-              </thead>
+                    <th className="py-3 pr-4 text-xs uppercase text-gray-500">Donations</th>
+                    <th className="py-3 pr-4 text-xs uppercase text-gray-500">Variance</th>
+                    <th className="py-3 pr-4 text-xs uppercase text-gray-500">Invoices</th>
+                  </tr>
+                </thead>
               <tbody>
-                {filteredRows.map((row) => (
+                {detailVisibleRows.map((row) => (
                   <tr key={row.id} className="border-b border-gray-50 align-top">
                     <td className="py-3 pr-4">
                       <div className="font-medium text-gray-900">{row.eventCode}</div>
@@ -485,11 +495,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                       <div className="text-xs text-gray-500">{formatCurrency(row.actualBudget)}</div>
                     </td>
                     <td className="py-3 pr-4">{formatCurrency(row.donations)}</td>
+                    <td className={`py-3 pr-4 font-medium ${row.budgetVariance > 0 ? 'text-red-600' : row.budgetVariance < 0 ? 'text-green-700' : 'text-gray-700'}`}>
+                      {row.budgetVariance > 0 ? '+' : ''}{formatCurrency(row.budgetVariance)}
+                    </td>
                     <td className="py-3 pr-4">{row.invoiceCount}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
       </PageShell>

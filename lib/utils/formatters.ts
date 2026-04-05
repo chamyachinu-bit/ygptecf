@@ -42,16 +42,16 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  draft: 'border border-slate-200 bg-slate-100/90 text-slate-700',
-  submitted: 'border border-sky-200 bg-sky-100/90 text-sky-700',
-  events_approved: 'border border-violet-200 bg-violet-100/90 text-violet-700',
-  finance_approved: 'border border-indigo-200 bg-indigo-100/90 text-indigo-700',
-  funded: 'border border-emerald-200 bg-emerald-100/90 text-emerald-700',
-  rejected: 'border border-rose-200 bg-rose-100/90 text-rose-700',
-  on_hold: 'border border-amber-200 bg-amber-100/90 text-amber-700',
-  completed: 'border border-teal-200 bg-teal-100/90 text-teal-700',
-  report_submitted: 'border border-cyan-200 bg-cyan-100/90 text-cyan-700',
-  archived: 'border border-slate-200 bg-slate-100/90 text-slate-500',
+  draft: 'app-panel-soft app-text-muted border',
+  submitted: 'app-info-soft',
+  events_approved: 'app-accent-soft',
+  finance_approved: 'app-accent-soft',
+  funded: 'app-success-soft',
+  rejected: 'app-danger-soft',
+  on_hold: 'app-warning-soft',
+  completed: 'app-success-soft',
+  report_submitted: 'app-info-soft',
+  archived: 'app-panel-soft app-text-subtle border',
 }
 
 export function cn(...classes: (string | undefined | null | false)[]): string {

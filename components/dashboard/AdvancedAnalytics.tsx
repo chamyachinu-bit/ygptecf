@@ -1,10 +1,13 @@
 'use client'
 
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -25,6 +28,8 @@ type MonthlyAnalyticsPoint = {
   plannedBudget: number
   actualBudget: number
   donations: number
+  expectedAttendees: number
+  actualAttendees: number
 }
 
 type StatusSlice = {
@@ -38,6 +43,9 @@ type RegionAnalyticsPoint = {
   events: number
   plannedBudget: number
   actualBudget: number
+  completed: number
+  expectedAttendees: number
+  actualAttendees: number
 }
 
 type GoalAnalyticsPoint = {
@@ -53,7 +61,7 @@ interface AdvancedAnalyticsProps {
 }
 
 function formatINR(value: number) {
-  return `₹${Number(value).toLocaleString('en-IN')}`
+  return `Rs ${Number(value).toLocaleString('en-IN')}`
 }
 
 export function AdvancedAnalytics({
@@ -86,20 +94,20 @@ export function AdvancedAnalytics({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly Budget Analysis</CardTitle>
+          <CardTitle className="text-base">Attendance and Delivery Trend</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={monthlyData}>
+            <ComposedChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value) => formatINR(Number(value))} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
               <Legend />
-              <Bar dataKey="plannedBudget" name="Planned Budget" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="actualBudget" name="Actual Budget" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="donations" name="Donations" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Bar dataKey="expectedAttendees" name="Expected" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="actualAttendees" name="Actual" fill="#16a34a" radius={[4, 4, 0, 0]} />
+              <Line type="monotone" dataKey="completed" name="Completed Events" stroke="#0f766e" strokeWidth={2} />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -154,6 +162,46 @@ export function AdvancedAnalytics({
               <Legend />
               <Bar dataKey="plannedBudget" name="Planned" fill="#14b8a6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="actualBudget" name="Actual" fill="#f97316" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Monthly Budget Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value) => formatINR(Number(value))} />
+              <Legend />
+              <Area type="monotone" dataKey="plannedBudget" name="Planned Budget" stroke="#22c55e" fill="#bbf7d0" />
+              <Area type="monotone" dataKey="actualBudget" name="Actual Budget" stroke="#0284c7" fill="#bae6fd" />
+              <Area type="monotone" dataKey="donations" name="Donations" stroke="#f59e0b" fill="#fde68a" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Region Delivery Health</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={regionData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+              <XAxis dataKey="region" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="events" name="Events" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="completed" name="Completed" fill="#0f766e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="actualAttendees" name="Actual Attendance" fill="#22c55e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

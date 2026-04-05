@@ -58,6 +58,8 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const profile = profileData as Profile | null
   if (!profile) redirect('/login')
+  if (profile.role === 'designer') redirect('/dashboard/flyer-requests')
+  if (profile.role === 'social_media_team') redirect('/dashboard/social-workflow')
 
   const { data: logsData } = await supabase
     .from('audit_logs')

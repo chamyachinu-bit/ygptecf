@@ -21,18 +21,18 @@ export function PageHero({
   children?: ReactNode
 }) {
   return (
-    <section className="overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-gradient-to-r from-slate-950 via-emerald-900 to-green-800 text-white shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
+    <section className="app-hero overflow-hidden rounded-[1.8rem] border app-border-soft shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
       <div className="grid gap-6 px-6 py-7 md:px-8 md:py-8 lg:grid-cols-[1.4fr_0.8fr]">
         <div className="space-y-4">
           {lead ? <div className="flex items-start">{lead}</div> : null}
           {eyebrow && (
-            <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-50/90">
+            <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] app-text-inverse-muted">
               {eyebrow}
             </div>
           )}
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">{title}</h1>
-            {subtitle && <p className="max-w-3xl text-sm leading-6 text-emerald-50/90 md:text-base">{subtitle}</p>}
+            <h1 className="text-2xl font-semibold tracking-tight app-text-inverse md:text-3xl">{title}</h1>
+            {subtitle ? <p className="max-w-3xl text-sm leading-6 app-text-inverse-muted md:text-base">{subtitle}</p> : null}
           </div>
         </div>
         {(actions || children) && (
@@ -60,10 +60,10 @@ export function StatCard({
   helper?: string
 }) {
   return (
-    <div className="rounded-[1.3rem] border border-slate-200/80 bg-white/95 p-5 shadow-[0_16px_32px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
-      {helper ? <p className="mt-2 text-sm text-slate-500">{helper}</p> : null}
+    <div className="app-panel rounded-[1.3rem] p-5">
+      <p className="app-text-subtle text-xs font-semibold uppercase tracking-[0.14em]">{label}</p>
+      <p className="app-text-strong mt-3 text-3xl font-semibold tracking-tight">{value}</p>
+      {helper ? <p className="app-text-muted mt-2 text-sm">{helper}</p> : null}
     </div>
   )
 }
@@ -81,10 +81,10 @@ export function SectionBlock({
 }) {
   return (
     <section className="app-page-section">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/70 px-6 py-5 md:px-7">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b app-border-soft px-6 py-5 md:px-7">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-          {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+          <h2 className="app-text-strong text-lg font-semibold">{title}</h2>
+          {subtitle ? <p className="app-text-muted mt-1 text-sm">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
@@ -103,9 +103,9 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50/90 px-6 py-12 text-center">
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">{message}</p>
+    <div className="app-panel-muted rounded-[1.5rem] border border-dashed px-6 py-12 text-center">
+      <h3 className="app-text-strong text-lg font-semibold">{title}</h3>
+      <p className="app-text-muted mx-auto mt-2 max-w-2xl text-sm leading-6">{message}</p>
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>
   )

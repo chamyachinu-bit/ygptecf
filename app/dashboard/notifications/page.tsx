@@ -10,7 +10,8 @@ import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { formatRelative } from '@/lib/utils/formatters'
-import type { NotificationType } from '@/types/database'
+import { ROLE_LABELS } from '@/lib/utils/permissions'
+import type { NotificationType, Profile } from '@/types/database'
 
 const TYPE_ICONS: Record<NotificationType, ReactNode> = {
   approval_required: <Calendar className="h-4 w-4 text-blue-500" />,
@@ -23,25 +24,90 @@ const TYPE_ICONS: Record<NotificationType, ReactNode> = {
 export default function NotificationsPage() {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null))
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      setUserId(user?.id ?? null)
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setProfile((data as Profile | null) ?? null)
+    })
   }, [supabase])
 
   const { notifications, markRead, markAllRead } = useNotifications(userId)
+  const role = profile?.role ?? 'regional_coordinator'
+  const warningTypes: NotificationType[] =
+    role === 'finance_team' || role === 'accounts_team' || role === 'admin' || role === 'bot'
+      ? ['budget_flagged', 'report_due']
+      : ['report_due', 'event_reminder']
+
+  const approvalLabel =
+    role === 'designer'
+      ? 'Creative Requests'
+      : role === 'social_media_team'
+        ? 'Content Requests'
+        : 'Approvals'
+
+  const movementLabel =
+    role === 'designer'
+      ? 'Flyer Updates'
+      : role === 'social_media_team'
+        ? 'Workflow Updates'
+        : 'Status Changes'
+
+  const warningLabel =
+    role === 'finance_team' || role === 'accounts_team' || role === 'admin' || role === 'bot'
+      ? 'Warnings'
+      : 'Reminders'
 
   const stats = [
     { label: 'Unread', value: String(notifications.length), helper: 'Current inbox items' },
-    { label: 'Approvals', value: String(notifications.filter((item) => item.type === 'approval_required').length), helper: 'Review-related updates' },
-    { label: 'Status Changes', value: String(notifications.filter((item) => item.type === 'status_changed').length), helper: 'Workflow movement alerts' },
-    { label: 'Warnings', value: String(notifications.filter((item) => ['budget_flagged', 'report_due'].includes(item.type)).length), helper: 'Items worth immediate attention' },
+    {
+      label: approvalLabel,
+      value: String(notifications.filter((item) => item.type === 'approval_required').length),
+      helper:
+        role === 'designer'
+          ? 'Flyer intake and approvals'
+          : role === 'social_media_team'
+            ? 'Content and documentation intake'
+            : 'Review-related updates',
+    },
+    {
+      label: movementLabel,
+      value: String(notifications.filter((item) => item.type === 'status_changed').length),
+      helper: 'Workflow movement alerts',
+    },
+    {
+      label: warningLabel,
+      value: String(notifications.filter((item) => warningTypes.includes(item.type)).length),
+      helper:
+        role === 'designer' || role === 'social_media_team'
+          ? 'Follow-up items worth revisiting'
+          : 'Items worth immediate attention',
+    },
   ]
+
+  const subtitle =
+    role === 'designer'
+      ? 'Track flyer requests, approval movement, and release updates from one focused creative inbox.'
+      : role === 'social_media_team'
+        ? 'Track post-event content requests, documentation handoffs, and completion updates from one focused social inbox.'
+        : `Stay on top of approvals, status updates, reporting deadlines, and workflow alerts from one ${profile ? ROLE_LABELS[role].toLowerCase() : 'executive'} inbox.`
+
+  function getOpenLabel(type: NotificationType, linkPath?: string | null) {
+    if (linkPath?.includes('/dashboard/flyer-requests')) return 'Open flyer workflow →'
+    if (linkPath?.includes('/dashboard/social-workflow')) return 'Open social workflow →'
+    if (type === 'approval_required') return 'Open request →'
+    if (type === 'report_due') return 'Open reporting →'
+    return 'Open item →'
+  }
 
   return (
     <div>
       <Header
         title="Notifications"
-        subtitle="Stay on top of approvals, status updates, reporting deadlines, and workflow alerts from one executive-style inbox."
+        subtitle={subtitle}
         eyebrow="Inbox"
       />
       <PageShell>
@@ -84,12 +150,12 @@ export default function NotificationsPage() {
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">{formatRelative(notification.created_at)}</p>
                       </div>
                       <div className="mt-4 flex flex-wrap items-center gap-3">
-                        {notification.event_id && (
+                        {(notification.link_path || notification.event_id) && (
                           <Link
-                            href={`/dashboard/events/${notification.event_id}`}
+                            href={notification.link_path || `/dashboard/events/${notification.event_id}`}
                             className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-slate-100"
                           >
-                            Open Event →
+                            {getOpenLabel(notification.type, notification.link_path)}
                           </Link>
                         )}
                         <button
