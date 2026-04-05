@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
+import { PasswordInput } from '@/components/ui/password-input'
 import { SaveToast } from '@/components/ui/save-toast'
 import { EmptyState, PageShell, SectionBlock, StatCard, StatGrid } from '@/components/ui/page-shell'
 import { ROLE_LABELS } from '@/lib/utils/permissions'
@@ -87,7 +88,7 @@ function regionAccessLabel(entry: Profile) {
   return entry.role === 'regional_coordinator' ? 'No region assigned' : 'All regions'
 }
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ saved?: string; view?: string }> }) {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ saved?: string; view?: string; user_q?: string }> }) {
   const params = await searchParams
   const supabase = await createClient()
   const {
@@ -119,11 +120,17 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const currentView: AdminSettingsView = SETTINGS_VIEWS.some((item) => item.view === params.view)
     ? (params.view as AdminSettingsView)
     : 'overview'
+  const userQuery = (params.user_q ?? '').trim().toLowerCase()
 
   const byRole = users.reduce<Record<string, number>>((acc, entry) => {
     acc[entry.role] = (acc[entry.role] || 0) + 1
     return acc
   }, {})
+  const filteredUsers = users.filter((entry) => {
+    if (!userQuery) return true
+    const haystack = `${entry.full_name} ${entry.email} ${entry.role} ${entry.region ?? ''}`.toLowerCase()
+    return haystack.includes(userQuery)
+  })
 
   async function updateUserAccess(formData: FormData) {
     'use server'
@@ -327,7 +334,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       />
 
       <PageShell>
-        <StatGrid className="xl:grid-cols-6">
+        <StatGrid className="xl:grid-cols-3 2xl:grid-cols-6">
           <StatCard label="Users in system" value={String(users.length)} helper="Approved and pending accounts" />
           <StatCard label="Pending approval" value={String(users.filter((entry) => entry.approval_status === 'pending_admin_approval').length)} helper="Needs admin review" />
           <StatCard label="Active regions" value={String(regions.filter((entry) => entry.is_active).length)} helper="Available in registration and EPF" />
@@ -554,58 +561,102 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           title="User Access And Approval"
           subtitle="Approve new registrations, update names and workflow roles, and manage account availability."
         >
-            <Card className="rounded-[1.5rem]">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="app-table-head sticky top-0 text-left">
-                    <tr className="app-table-row border-b">
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Name</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Email</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Access Controls</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Region</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Status</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Joined</th>
-                      <th className="app-text-subtle px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em]">Password And Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((entry) => (
-                      <tr key={entry.id} className="app-table-row align-top transition hover:bg-[var(--app-surface-soft)]">
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="app-success-soft flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-semibold">
+          <div className="space-y-4">
+            <div className="app-panel-soft flex flex-col gap-3 rounded-[1.35rem] px-4 py-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="app-text-strong text-sm font-semibold">User directory</p>
+                <p className="app-text-subtle text-xs">
+                  Showing {filteredUsers.length} of {users.length} accounts
+                </p>
+              </div>
+              <form action="/dashboard/admin/users" className="grid gap-3 md:min-w-[360px] md:grid-cols-[1fr_auto]">
+                <input type="hidden" name="view" value="users" />
+                <input
+                  type="text"
+                  name="user_q"
+                  defaultValue={params.user_q ?? ''}
+                  placeholder="Search by name, email, role, or region"
+                  className="app-field h-11 rounded-2xl px-4 text-sm outline-none transition"
+                />
+                <button className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(22,163,74,0.24)]">
+                  Search
+                </button>
+              </form>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <EmptyState
+                title="No users match this search"
+                message="Try a different name, email, role, or region filter."
+              />
+            ) : (
+              <div className="grid gap-4">
+                {filteredUsers.map((entry) => (
+                  <Card key={entry.id} className="rounded-[1.5rem]">
+                    <CardContent className="p-5 md:p-6">
+                      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.2fr_0.95fr]">
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-3">
+                            <div className="app-success-soft flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-semibold">
                               {entry.full_name.charAt(0).toUpperCase()}
                             </div>
-                            <div>
-                              <p className="app-text-strong font-semibold">{entry.full_name}</p>
-                              <p className="app-text-subtle text-xs">{entry.phone || 'No phone on file'}</p>
+                            <div className="min-w-0">
+                              <p className="app-text-strong text-lg font-semibold leading-6">{entry.full_name}</p>
+                              <p className="app-text-muted break-all text-sm">{entry.email}</p>
+                              <p className="app-text-subtle mt-1 text-xs">{entry.phone || 'No phone on file'}</p>
                             </div>
                           </div>
-                        </td>
-                        <td className="app-text-muted px-6 py-5">{entry.email}</td>
-                        <td className="px-6 py-5">
-                          <form action={updateUserAccess} className="space-y-3">
-                            <input type="hidden" name="user_id" value={entry.id} />
-                            <input
-                              type="text"
-                              name="full_name"
-                              defaultValue={entry.full_name}
-                              className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
-                              placeholder="Full name"
-                            />
-                            <select
-                              name="role"
-                              defaultValue={entry.role}
-                              className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
-                            >
-                              {ROLES.map((role) => (
-                                <option key={role} value={role}>
-                                  {ROLE_LABELS[role]}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                            <div className="app-panel-soft rounded-2xl px-4 py-3">
+                              <p className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Region access</p>
+                              <p className="app-text mt-2 text-sm font-medium">{regionAccessLabel(entry)}</p>
+                            </div>
+                            <div className="app-panel-soft rounded-2xl px-4 py-3">
+                              <p className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Joined</p>
+                              <p className="app-text mt-2 text-sm font-medium">{formatDate(entry.created_at)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${activePillClass(entry.is_active)}`}>
+                              {entry.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass(entry.approval_status)}`}>
+                              {approvalLabel(entry.approval_status)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <form action={updateUserAccess} className="space-y-3">
+                          <input type="hidden" name="user_id" value={entry.id} />
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <label className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Full name</label>
+                              <input
+                                type="text"
+                                name="full_name"
+                                defaultValue={entry.full_name}
+                                className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
+                                placeholder="Full name"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Role</label>
+                              <select
+                                name="role"
+                                defaultValue={entry.role}
+                                className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
+                              >
+                                {ROLES.map((role) => (
+                                  <option key={role} value={role}>
+                                    {ROLE_LABELS[role]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Region</label>
                               <select
                                 name="region"
                                 defaultValue={entry.region ?? ''}
@@ -622,6 +673,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                                     </option>
                                   ))}
                               </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Approval</label>
                               <select
                                 name="approval_status"
                                 defaultValue={entry.approval_status}
@@ -634,7 +688,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                                 ))}
                               </select>
                             </div>
-                            <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                            <div className="space-y-1.5 md:max-w-[220px]">
+                              <label className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Account state</label>
                               <select
                                 name="is_active"
                                 defaultValue={entry.is_active ? 'true' : 'false'}
@@ -643,63 +698,60 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                                 <option value="true">Active</option>
                                 <option value="false">Inactive</option>
                               </select>
-                              <button className="app-field app-text rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:bg-[var(--app-surface-soft)]">
-                                Save Access
-                              </button>
                             </div>
-                          </form>
-                        </td>
-                        <td className="app-text-muted px-6 py-5">{regionAccessLabel(entry)}</td>
-                        <td className="px-6 py-5">
-                          <div className="flex flex-col gap-2">
-                            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${activePillClass(entry.is_active)}`}>
-                              {entry.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass(entry.approval_status)}`}>
-                              {approvalLabel(entry.approval_status)}
-                            </span>
                           </div>
-                        </td>
-                        <td className="app-text-subtle px-6 py-5 text-xs">{formatDate(entry.created_at)}</td>
-                        <td className="px-6 py-5">
-                          <div className="space-y-3">
-                            <form action={updateUserPassword} className="space-y-2">
+                          <div className="flex justify-end">
+                            <button className="app-field app-text rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:bg-[var(--app-surface-soft)]">
+                              Save Access
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="space-y-3">
+                          <div className="app-panel-soft rounded-2xl px-4 py-3">
+                            <p className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Password reset</p>
+                            <form action={updateUserPassword} className="mt-3 space-y-2">
                               <input type="hidden" name="user_id" value={entry.id} />
-                              <input
-                                type="password"
+                              <PasswordInput
                                 name="new_password"
                                 minLength={8}
-                                placeholder="Set new password (min 8 chars)"
-                                className="app-field h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
+                                placeholder="Set new password"
                               />
                               <button className="app-success-soft w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:brightness-[1.03]">
                                 Save New Password
                               </button>
                             </form>
-                            <p className="app-text-subtle text-xs leading-5">
-                              Existing passwords cannot be viewed for security reasons. Admin can securely set a fresh password here.
-                            </p>
-                            <p className="app-text-subtle text-xs leading-5">
-                              Access changes apply on the user&apos;s next refresh or login.
-                            </p>
-                            <form action={deleteUser}>
-                              <input type="hidden" name="user_id" value={entry.id} />
-                              <button
-                                className="app-danger-soft w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={entry.id === adminUserId}
-                              >
-                                {entry.id === adminUserId ? 'Current admin cannot be deleted here' : 'Delete User'}
-                              </button>
-                            </form>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                          <div className="app-panel-soft rounded-2xl px-4 py-3">
+                            <p className="app-text-subtle text-[11px] font-semibold uppercase tracking-[0.14em]">Admin notes</p>
+                            <div className="mt-3 space-y-2">
+                              <p className="app-text-subtle text-xs leading-5">
+                                Existing passwords cannot be viewed for security reasons. Admin can securely set a fresh password here.
+                              </p>
+                              <p className="app-text-subtle text-xs leading-5">
+                                Access changes apply on the user&apos;s next refresh or login.
+                              </p>
+                            </div>
+                          </div>
+
+                          <form action={deleteUser}>
+                            <input type="hidden" name="user_id" value={entry.id} />
+                            <button
+                              className="app-danger-soft w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={entry.id === adminUserId}
+                            >
+                              {entry.id === adminUserId ? 'Current admin cannot be deleted here' : 'Delete User'}
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </SectionBlock>
         )}
 

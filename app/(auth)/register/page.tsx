@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -107,7 +108,7 @@ export default function RegisterPage() {
       <div className="min-h-screen bg-transparent px-4 py-8">
         <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center">
           <Card className="w-full overflow-hidden">
-            <div className="border-b border-slate-200 bg-gradient-to-r from-green-50 to-white px-6 py-5 text-center">
+            <div className="app-panel-soft border-b app-border-soft px-6 py-5 text-center">
               <img src={APP_LOGO_URL} alt={APP_NAME} className="mx-auto h-12 w-12 rounded-full object-cover" />
               <CardTitle className="mt-4">Check your email</CardTitle>
               <CardDescription className="mt-2">
@@ -115,7 +116,7 @@ export default function RegisterPage() {
               </CardDescription>
             </div>
             <CardContent className="space-y-4 pt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="app-text-muted text-sm">
                 We sent a confirmation link to <strong>{form.email}</strong>. After verification, your account will remain pending until an admin approves it.
               </p>
               <Link href="/login">
@@ -160,7 +161,7 @@ export default function RegisterPage() {
             </div>
 
             <Card className="overflow-hidden">
-              <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+              <div className="app-panel-soft border-b app-border-soft px-6 py-5">
                 <CardTitle>Create Account</CardTitle>
                 <CardDescription className="mt-2">Register for controlled access to the YGPT EVENT workspace.</CardDescription>
               </div>
@@ -187,28 +188,27 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Password</Label>
-                    <Input
-                      type="password"
+                    <PasswordInput
                       placeholder="Minimum 8 characters"
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                       required
                       minLength={8}
                     />
-                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3">
+                    <div className="app-panel-soft space-y-2 rounded-xl p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Password strength</p>
+                        <p className="app-text-subtle text-xs font-semibold uppercase tracking-[0.12em]">Password strength</p>
                         <p className={`text-xs font-semibold ${passwordState.label === 'Strong' ? 'text-emerald-600' : passwordState.label === 'Good' ? 'text-green-600' : passwordState.label === 'Fair' ? 'text-amber-600' : 'text-red-600'}`}>
                           {passwordState.label}
                         </p>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--app-surface-inverse)]/14">
                         <div
                           className={`h-full rounded-full transition-all ${passwordState.tone}`}
                           style={{ width: `${Math.max(form.password ? 16 : 0, passwordState.score * 20)}%` }}
                         />
                       </div>
-                      <div className="grid gap-1 text-xs text-slate-600">
+                      <div className="grid gap-1 text-xs app-text-muted">
                         <PasswordCheck ok={passwordState.checks.length}>At least 8 characters</PasswordCheck>
                         <PasswordCheck ok={passwordState.checks.upper}>Uppercase letter</PasswordCheck>
                         <PasswordCheck ok={passwordState.checks.lower}>Lowercase letter</PasswordCheck>
@@ -232,7 +232,7 @@ export default function RegisterPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-gray-500">
+                    <p className="app-text-subtle text-xs">
                       New accounts begin as Regional Coordinator and require admin approval before they can use the dashboard.
                     </p>
                   </div>
@@ -241,7 +241,7 @@ export default function RegisterPage() {
                     <select
                       value={form.region}
                       onChange={(e) => setForm({ ...form, region: e.target.value })}
-                      className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="app-field flex h-10 w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                       required
                     >
                       <option value="">Select region</option>
@@ -258,14 +258,14 @@ export default function RegisterPage() {
                     )}
                   </div>
                   {error && (
-                    <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</div>
+                    <div className="app-danger-soft rounded-xl p-3 text-sm">{error}</div>
                   )}
                   <Button type="submit" className="w-full" loading={loading}>
                     Create Account
                   </Button>
-                  <p className="text-center text-sm text-gray-600">
+                  <p className="app-text-muted text-center text-sm">
                     Already have an account?{' '}
-                    <Link href="/login" className="font-medium text-green-600 hover:underline">
+                    <Link href="/login" className="font-medium text-emerald-600 hover:underline dark:text-emerald-300">
                       Sign In
                     </Link>
                   </p>
@@ -290,10 +290,10 @@ function AuthFeature({ title, body }: { title: string; body: string }) {
 
 function PasswordCheck({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
-    <div className={`flex items-center gap-2 ${ok ? 'text-emerald-700' : 'text-slate-500'}`}>
+    <div className={`flex items-center gap-2 ${ok ? 'text-emerald-700 dark:text-emerald-300' : 'app-text-subtle'}`}>
       <span
         className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
-          ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+          ok ? 'app-success-soft' : 'app-panel-soft app-text-subtle'
         }`}
       >
         {ok ? '✓' : '•'}

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { AppBrand } from '@/components/branding/AppBrand'
@@ -37,43 +38,50 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-transparent px-4 py-8">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden overflow-hidden rounded-[2rem] border border-slate-200/80 bg-gradient-to-br from-slate-950 via-emerald-900 to-green-800 p-8 text-white shadow-[0_30px_80px_rgba(15,23,42,0.18)] lg:flex lg:flex-col lg:justify-between">
-          <div className="space-y-6">
+      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-8 lg:grid-cols-[1.08fr_0.92fr]">
+        <section className="hidden overflow-hidden rounded-[2rem] border border-white/8 bg-[linear-gradient(140deg,#071321_0%,#0d2a3c_32%,#0e6a4b_100%)] p-10 text-white shadow-[0_36px_80px_rgba(2,6,23,0.34)] lg:flex lg:flex-col lg:justify-between">
+          <div className="space-y-8">
             <AppBrand dark />
-            <div className="space-y-4">
-              <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-50/90">
-                Operations platform
+            <div className="space-y-5">
+              <div className="inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-100/90">
+                Secure Sign In
               </div>
-              <h1 className="max-w-xl text-4xl font-semibold leading-tight">
-                Executive-grade NGO event operations, approvals, reporting, and audit visibility.
-              </h1>
-              <p className="max-w-xl text-sm leading-7 text-emerald-50/85">
-                Sign in to manage proposals, funding reviews, completion reporting, final reports, analytics, and Drive-linked documentation from one role-aware workspace.
-              </p>
+              <div className="space-y-4">
+                <h1 className="max-w-xl text-[3.25rem] font-semibold leading-[1.06] tracking-[-0.03em]">
+                  Welcome back to your YGPT EVENT workspace.
+                </h1>
+                <p className="max-w-lg text-base leading-8 text-slate-100/78">
+                  Access your account from one clean, secure sign-in experience designed for daily coordination and leadership review.
+                </p>
+              </div>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            <AuthFeature title="Role-aware" body="Dashboards and actions adapt to the work each team actually needs to do." />
-            <AuthFeature title="Report-ready" body="Final reports compare proposal intent with actual delivery in a leadership-friendly format." />
-            <AuthFeature title="Audit-safe" body="History, notifications, and approvals remain visible and traceable throughout the workflow." />
+            <LoginFeature title="Trusted access" body="Each sign-in starts from a secure, controlled account experience." />
+            <LoginFeature title="Calm workflow" body="A focused workspace helps teams move faster with less confusion." />
+            <LoginFeature title="Professional view" body="Built for internal teams who need clarity, consistency, and speed." />
           </div>
         </section>
 
         <div className="flex items-center justify-center">
-          <div className="w-full max-w-md space-y-6">
+          <div className="w-full max-w-[33rem] space-y-6">
             <div className="flex items-center justify-center lg:hidden">
               <AppBrand />
             </div>
 
-            <Card className="overflow-hidden">
-              <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
-                <CardTitle>Sign In</CardTitle>
-                <CardDescription className="mt-2">Enter your credentials to access the YGPT EVENT workspace.</CardDescription>
+            <Card className="overflow-hidden rounded-[2rem] border-white/8 shadow-[0_26px_64px_rgba(2,6,23,0.22)]">
+              <div className="app-panel-soft border-b app-border-soft px-7 py-6">
+                <div className="space-y-2">
+                  <p className="app-text-subtle text-xs font-semibold uppercase tracking-[0.18em]">Microsoft-style sign in</p>
+                  <CardTitle className="text-[1.8rem] tracking-[-0.02em]">Sign in</CardTitle>
+                  <CardDescription className="text-sm leading-6">
+                    Enter your email and password to continue.
+                  </CardDescription>
+                </div>
               </div>
-              <CardContent className="pt-6">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-1.5">
+              <CardContent className="px-7 pb-7 pt-7">
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -85,32 +93,29 @@ export default function LoginPage() {
                       autoComplete="email"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
+                    <PasswordInput id="password" placeholder="Minimum 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                   </div>
                   {error && (
-                    <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
+                    <div className="app-danger-soft rounded-xl p-3 text-sm">
                       {error}
                     </div>
                   )}
-                  <Button type="submit" className="w-full" loading={loading}>
+                  <Button type="submit" className="h-12 w-full rounded-2xl text-base font-semibold" loading={loading}>
                     Sign In
                   </Button>
-                  <p className="text-center text-sm text-gray-600">
-                    Don&apos;t have an account?{' '}
-                    <Link href="/register" className="font-medium text-green-600 hover:underline">
-                      Register
-                    </Link>
-                  </p>
+                  <div className="space-y-3 pt-1 text-center">
+                    <p className="app-text-muted text-sm">
+                      Don&apos;t have an account?{' '}
+                      <Link href="/register" className="font-medium text-emerald-600 hover:underline dark:text-emerald-300">
+                        Register
+                      </Link>
+                    </p>
+                    <p className="app-text-subtle text-xs">
+                      By continuing, you confirm you are authorized to access this workspace.
+                    </p>
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -121,11 +126,11 @@ export default function LoginPage() {
   )
 }
 
-function AuthFeature({ title, body }: { title: string; body: string }) {
+function LoginFeature({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-[1.4rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+    <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
       <p className="text-sm font-semibold text-white">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-emerald-50/85">{body}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-100/78">{body}</p>
     </div>
   )
 }

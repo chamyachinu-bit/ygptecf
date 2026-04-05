@@ -59,14 +59,14 @@ export default async function PendingApprovalPage() {
             </div>
 
             <Card className="overflow-hidden">
-              <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+              <div className="app-panel-soft border-b app-border-soft px-6 py-5">
                 <CardTitle>{title}</CardTitle>
               </div>
               <CardContent className="space-y-4 pt-6">
-                <p className="text-sm leading-6 text-gray-600">
+                <p className="app-text-muted text-sm leading-6">
                   Hello {profile?.full_name || user.email}, {message}
                 </p>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="app-panel-soft rounded-xl p-4 text-sm app-text-muted">
                   You can close this page for now and return after the admin team confirms your access.
                 </div>
                 <form
