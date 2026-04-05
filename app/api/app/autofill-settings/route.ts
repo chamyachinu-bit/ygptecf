@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,28 +10,35 @@ export async function GET() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ enabled: false }, { status: 401 })
+    return NextResponse.json({ enabled: false }, {
+      status: 401,
+      headers: { 'Cache-Control': 'no-store' },
+    })
   }
 
-  // Uses a security-definer function so any authenticated user can read
-  // this one setting without exposing other sensitive app_settings fields.
-  const { data, error } = await supabase.rpc('get_demo_autofill_enabled')
+  // Try security-definer RPC first (works for any authenticated user)
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_demo_autofill_enabled')
 
-  if (error) {
-    // Fallback: try reading directly via service client
-    const { createServiceClient } = await import('@/lib/supabase/server')
-    try {
-      const service = await createServiceClient()
-      const { data: settings } = await service
-        .from('app_settings')
-        .select('demo_autofill_enabled')
-        .eq('id', 'global')
-        .maybeSingle()
-      return NextResponse.json({ enabled: Boolean(settings?.demo_autofill_enabled) })
-    } catch {
-      return NextResponse.json({ enabled: false })
-    }
+  if (!rpcError && rpcData !== null) {
+    return NextResponse.json({ enabled: Boolean(rpcData) }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    })
   }
 
-  return NextResponse.json({ enabled: Boolean(data) })
+  // Fallback: service client bypasses RLS
+  try {
+    const service = await createServiceClient()
+    const { data: settings } = await service
+      .from('app_settings')
+      .select('demo_autofill_enabled')
+      .eq('id', 'global')
+      .maybeSingle()
+    return NextResponse.json({ enabled: Boolean(settings?.demo_autofill_enabled) }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    })
+  } catch {
+    return NextResponse.json({ enabled: false }, {
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
 }
